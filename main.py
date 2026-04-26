@@ -24,6 +24,7 @@ from src.data_extract.pdf_loader import load_pdf
 from src.data_extract.markdown_converter import pdf_text_to_markdown
 from src.rag.chunking import markdown_chunker
 from src.rag.chunking_utils import save_chunks_to_jsonl
+from src.rag.embeddings import embed_chunks
 import os
 import logging
 
@@ -81,7 +82,14 @@ def run_pipeline(pdf_path: str):
     logging.info("=" * 50)
     logging.info(f"✓ Saved {len(chunks)} chunks to {jsonl_path}")
 
-    # TODO: add embeddings part
+    # 5. Generate embeddings and save enriched chunks to a separate JSONL
+    logging.info("=" * 50)
+    logging.info("Generating embeddings (this may take a while for large documents)...")
+    embedded_chunks = embed_chunks(chunks)
+
+    embedded_jsonl_path = f"./json_chunks/{os.path.splitext(base_file_name)[0]}_embedded.jsonl"
+    save_chunks_to_jsonl(embedded_chunks, embedded_jsonl_path)
+    logging.info(f"✓ Saved {len(embedded_chunks)} embedded chunks to {embedded_jsonl_path}")
 
 if __name__ == "__main__":
     # file_to_convert = "sample_final_part_1.pdf"

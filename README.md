@@ -43,7 +43,7 @@ LLM_Local/
 │       ├── __init__.py
 │       ├── chunking.py            # Markdown-aware chunking logic
 │       ├── chunking_utils.py      # JSONL save utilities
-│       ├── embeddings.py          # TODO: Embedding generation
+│       ├── embeddings.py          # Embedding generation via local Ollama
 │       └── vectorstore.py         # TODO: Vector store integration
 ├── main.py                         # Pipeline orchestration (draft)
 ├── pyproject.toml                  # Project metadata & dependencies
@@ -174,6 +174,36 @@ Saves chunks to JSONL format.
 
 ---
 
+#### `get_embedding(text: str, model: str = "nomic-embed-text") -> List[float]`
+Generates a vector embedding for a single text string using a local Ollama model.
+
+**Parameters:**
+- `text` (str): Input text to embed
+- `model` (str): Ollama embedding model name (default: `"nomic-embed-text"`)
+
+**Returns:**
+- `List[float]`: The embedding vector
+
+**Recommended models** (pull with `ollama pull <model>` before use):
+- `nomic-embed-text` — fast, 768-dim, good for most RAG use cases
+- `mxbai-embed-large` — higher quality, 1024-dim, better retrieval scores
+
+> ⚠️ Use a **dedicated embedding model**, not a generative model like `llama3.1:8b`.
+
+---
+
+#### `embed_chunks(chunks: List[Dict], model: str = "nomic-embed-text") -> List[Dict]`
+Adds an `"embedding"` field to each chunk dict and returns the enriched list.
+
+**Parameters:**
+- `chunks` (List[Dict]): Chunk dicts from `markdown_chunker()` — `{"text": str, "heading": str}`
+- `model` (str): Ollama embedding model name (default: `"nomic-embed-text"`)
+
+**Returns:**
+- `List[Dict]`: Same list with `"embedding": List[float]` added to every chunk
+
+---
+
 ## Configuration
 
 ### Chunking Parameters
@@ -203,7 +233,7 @@ See `requirements.txt` for exact versions.
 
 ## Roadmap
 
-- [ ] **Embeddings Module**: Integration with OpenAI, HuggingFace, or local models
+- [x] **Embeddings Module**: Local embedding generation via Ollama (`nomic-embed-text` / `mxbai-embed-large`)
 - [ ] **Vector Store**: FAISS or Pinecone integration
 - [ ] **LangChain Integration**: Seamless RAG pipeline
 - [ ] **Enhanced CLI**: Command-line interface for batch processing
@@ -215,7 +245,7 @@ See `requirements.txt` for exact versions.
 ## Known Issues & TODOs
 
 1. **main.py**: Currently a draft version - see inline TODOs
-2. **embeddings.py** & **vectorstore.py**: Placeholder modules - implementation pending
+2. **vectorstore.py**: Placeholder module - implementation pending
 3. **Error Handling**: Consider adding more robust error handling for edge cases
 4. **Type Hints**: Could be enhanced with more specific return types
 
