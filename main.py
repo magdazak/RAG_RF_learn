@@ -25,65 +25,68 @@ from src.data_extract.markdown_converter import pdf_text_to_markdown
 from src.rag.chunking import markdown_chunker
 from src.rag.chunking_utils import save_chunks_to_jsonl
 import os
+import logging
 
-def run_pipeline(file_name: str, pdf_path: str, output_path: str):
+logging.basicConfig(level=logging.INFO)
+
+def run_pipeline(pdf_path: str):
     """
     Run the RAG pipeline: markdown chunking + JSONL saving.
 
     Args:
-        file_name (str): Name of the document (without extension)
-        pdf_path (str): Path to the PDF file (currently unused in draft)
-        output_path (str): Path where markdown file is expected
+        pdf_path (str): Path to the PDF file to process. The output markdown file will be saved in data_processed/ with the same base name.
 
     Returns:
         None
 
     Raises:
-        FileNotFoundError: If markdown file does not exist at output_path
+        FileNotFoundError: If Markdown file does not exist at output_path
     """
-    # # DISABLED IN DRAFT: PDF → Text extraction
-    # # Uncomment when ready to process PDFs from raw
-    # # raw = load_pdf(pdf_path)
-    # # md = pdf_text_to_markdown(raw)
-    # # with open(output_path, "w", encoding="utf-8") as f:
-    # #     f.write(md)
+    # --- PDF → Text extraction ---
+    base_file_name = os.path.basename(pdf_path)
+    logging.info("=" * 50)
+    logging.info(f"Starting with file: {base_file_name}...")
 
-    # Ensure output_path is formatted with file_name if needed
-    base_name = os.path.splitext(file_name)[0]
-    output_path = output_path.format(file_name=base_name)
+    raw = load_pdf(pdf_path)
+    md = pdf_text_to_markdown(raw)
+
+    md_output_path = f"data_processed/{os.path.splitext(base_file_name)[0]}.md"
+    with open(md_output_path, "w", encoding="utf-8") as f:
+        f.write(md)
 
     # --- RAG chunking and saving as JSONL ---
+    #
+    # # test only: get file content from existing .md file from 'data_processed' instead of re-processing the PDF
+    # # below 'md' is only for testing the chunking and saving part, should replace with actual .md file content
+    #
+    # # Check if the output markdown file exists
+    # if not os.path.exists(output_path):
+    #     raise FileNotFoundError(f"Markdown file not found: {output_path}")
 
-    # TODO: get file content from existing .md file from 'data_processed' instead of re-processing the PDF
-    # below 'md' is only for testing the chunking and saving part, should replace with actual .md file content
+    logging.info("=" * 50)
+    logging.info(f"Processing: {base_file_name} to chunks")
 
-    # Check if the output markdown file exists
-    if not os.path.exists(output_path):
-        raise FileNotFoundError(f"Markdown file not found: {output_path}")
-
-    # Read markdown content
-    md = open(output_path, encoding="utf-8").read()
-
-    print(f"Processing: {base_name}")
-    jsonl_path = f"./json_chunks/{base_name}.jsonl"
-
-    # Ensure the output directory exists
+    # 1. Ensure the 'chunks' output directory exists
+    jsonl_path = f"./json_chunks/{os.path.splitext(base_file_name)[0]}.jsonl"
     os.makedirs(os.path.dirname(jsonl_path), exist_ok=True)
 
-    # Chunk the markdown text
+    # 2. Read Markdown content
+    md = open(md_output_path, encoding="utf-8").read()
+
+    # 3. Chunk the markdown text
     chunks = markdown_chunker(md, max_chunk_size=1000, overlap=100)
 
-    # Save chunks to JSONL
+    # 4. Save chunks to JSONL
     save_chunks_to_jsonl(chunks, jsonl_path)
-    print(f"✓ Saved {len(chunks)} chunks to {jsonl_path}")
+    logging.info("=" * 50)
+    logging.info(f"✓ Saved {len(chunks)} chunks to {jsonl_path}")
 
-# TODO: test only the RAG chunk part
+    # TODO: add embeddings part
+
 if __name__ == "__main__":
-    file_name = "sample_final_part_1.pdf"
+    # file_to_convert = "sample_final_part_1.pdf"
+    file_to_convert = "BackupTool.pdf"
 
     run_pipeline(
-        file_name="sample_final_part_1.pdf",
-        # pdf_path="data_raw/BackupTool.pdf",
-        pdf_path=f"C:/CLIENT/PRODUCT_NET2/doc/{file_name}.pdf",
-        output_path="data_processed/{file_name}.md"
+        pdf_path=f"C:/CLIENT/PRODUCT_NET2/doc/{file_to_convert}"
     )
