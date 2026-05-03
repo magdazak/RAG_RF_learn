@@ -56,6 +56,26 @@ uv pip install chromadb
 
 Then add `chromadb` to `requirements.txt`.
 
+> #### ⚖️ Installation Weight — What to Expect
+>
+> Installing `chromadb` pulls in **~60 transitive dependencies** totalling approximately **~189 MB** on disk.
+> This is largely unavoidable with ChromaDB 1.x.
+>
+> **Main contributors:**
+>
+> | Package | Size | Notes |
+> |---|---|---|
+> | `chromadb_rust_bindings` | ~60 MB | Compiled Rust core — unavoidable |
+> | `onnxruntime` | ~36 MB | Built-in embeddings engine — **not used** in our pipeline (we use Ollama) |
+> | `numpy` + `numpy.libs` | ~39 MB | Numerical arrays |
+> | `kubernetes` | ~16 MB | Client-server mode support — not needed locally |
+> | `hf_xet` + `tokenizers` | ~15 MB | HuggingFace large-file & tokenizer support |
+> | Everything else | ~23 MB | grpcio, opentelemetry, rich, fsspec, uvicorn, etc. |
+>
+> **Key note**: `onnxruntime` (~36 MB) is only invoked when ChromaDB generates embeddings *internally*.
+> Since this project injects **pre-computed embeddings from Ollama**, `onnxruntime` is dead weight —
+> but there is no install flag to exclude it in the current ChromaDB release.
+
 ---
 
 ### Step 2 — Implement `src/rag/vectorstore.py`
