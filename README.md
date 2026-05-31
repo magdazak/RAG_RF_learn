@@ -9,7 +9,9 @@ This project provides a complete pipeline for:
 1. **PDF Extraction**: Convert PDF documents to raw text
 2. **Text Processing**: Clean, normalize, and convert text to Markdown format
 3. **Semantic Chunking**: Split Markdown content into semantically meaningful chunks
-4. **Output Generation**: Save chunks as JSONL files for downstream processing
+4. **Embedding Generation**: Generate vector embeddings using local Ollama models
+5. **Vector Storage**: Persist embeddings in ChromaDB for semantic search
+6. **Output Generation**: Save chunks as JSONL files for downstream processing
 
 ## Features
 
@@ -26,6 +28,15 @@ This project provides a complete pipeline for:
   - Heading-aware section splitting
   - Configurable chunk size and overlap
   - Semantic preservation of document structure
+- 🧠 **Local Embeddings**:
+  - Ollama integration for vector embeddings
+  - Default: `nomic-embed-text` (768 dimensions)
+  - No cloud dependencies
+- 🗄️ **Vector Store (ChromaDB)**:
+  - Persistent local storage
+  - Semantic similarity search
+  - Metadata filtering support
+  - HNSW indexing for fast retrieval
 - 💾 **JSONL Output**: Save chunks with heading context for RAG pipelines
 
 ## Project Structure
@@ -44,7 +55,7 @@ LLM_Local/
 │       ├── chunking.py            # Markdown-aware chunking logic
 │       ├── chunking_utils.py      # JSONL save utilities
 │       ├── embeddings.py          # Embedding generation via local Ollama
-│       └── vectorstore.py         # TODO: Vector store integration
+│       └── vectorstore.py         # ChromaDB vector store integration
 ├── main.py                         # Pipeline orchestration (draft)
 ├── pyproject.toml                  # Project metadata & dependencies
 ├── requirements.txt                # Dependency pinning
@@ -58,6 +69,8 @@ LLM_Local/
 ### Prerequisites
 - Python 3.12+
 - pip or uv package manager
+- **Ollama** (for embeddings) - [Install Ollama](https://ollama.ai/)
+  - Pull the embedding model: `ollama pull nomic-embed-text`
 
 ### Setup
 
@@ -95,6 +108,8 @@ from src.data_extract.pdf_loader import load_pdf
 from src.data_extract.markdown_converter import pdf_text_to_markdown
 from src.rag.chunking import markdown_chunker
 from src.rag.chunking_utils import save_chunks_to_jsonl
+from src.rag.embeddings import embed_chunks
+from src.rag.vectorstore import build_vectorstore, query_vectorstore
 
 # 1. Extract text from PDF
 pdf_path = "path/to/document.pdf"
@@ -108,6 +123,28 @@ chunks = markdown_chunker(markdown_text, max_chunk_size=1000, overlap=100)
 
 # 4. Save as JSONL
 save_chunks_to_jsonl(chunks, "output/chunks.jsonl")
+
+# 5. Generate embeddings (requires Ollama running locally)
+embedded_chunks = embed_chunks(chunks, model="nomic-embed-text")
+
+# 6. Store in ChromaDB vector store
+build_vectorstore(
+    embedded_chunks,
+    collection_name="my_docs",
+    persist_dir="./chroma_db"
+)
+
+# 7. Query the vector store
+results = query_vectorstore(
+    query_text="How do I reset a password?",
+    collection_name="my_docs",
+    n_results=5
+)
+
+for result in results:
+    print(f"Distance: {result['distance']:.3f}")
+    print(f"Heading: {result['heading']}")
+    print(f"Text: {result['text'][:200]}...\n")
 ```
 
 ### Running the Pipeline
@@ -204,6 +241,48 @@ Adds an `"embedding"` field to each chunk dict and returns the enriched list.
 
 ---
 
+#### `build_vectorstore(embedded_chunks: List[Dict], collection_name: str = "product_docs", persist_dir: str = "./chroma_db")`
+Stores embedded chunks in a persistent ChromaDB collection.
+
+**Parameters:**
+- `embedded_chunks` (List[Dict]): Chunks with embeddings from `embed_chunks()`
+- `collection_name` (str): Name of the ChromaDB collection (default: `"product_docs"`)
+- `persist_dir` (str): Directory for ChromaDB persistence (default: `"./chroma_db"`)
+
+**Features:**
+- Idempotent upserts — safe to call repeatedly
+- Automatic persistence — survives restarts
+- Stores text, embeddings, and metadata (`heading`)
+
+---
+
+#### `query_vectorstore(query_text: str, collection_name: str = "product_docs", persist_dir: str = "./chroma_db", n_results: int = 5, model: str = "nomic-embed-text") -> List[Dict]`
+Performs semantic search on the vector store.
+
+**Parameters:**
+- `query_text` (str): Natural language question or search phrase
+- `collection_name` (str): ChromaDB collection name (default: `"product_docs"`)
+- `persist_dir` (str): Directory where ChromaDB data is stored (default: `"./chroma_db"`)
+- `n_results` (int): Number of top results to return (default: 5)
+- `model` (str): Ollama model for query embedding (default: `"nomic-embed-text"`)
+
+**Returns:**
+- `List[Dict]`: Results sorted by similarity, each containing:
+  - `"text"` (str): Chunk text
+  - `"heading"` (str): Section heading
+  - `"distance"` (float): Similarity distance (lower = more similar)
+
+**Example:**
+```python
+results = query_vectorstore(
+    query_text="How do I reset a password?",
+    n_results=3
+)
+# Returns chunks most similar to the query
+```
+
+---
+
 ## Configuration
 
 ### Chunking Parameters
@@ -218,23 +297,64 @@ Adjust these in `main.py` or when calling `markdown_chunker()`:
   - Prevents loss of context at chunk boundaries
   - Typical: 10-20% of max_chunk_size
 
+### Vector Store Parameters
+
+Configure these when calling `build_vectorstore()` and `query_vectorstore()`:
+
+- **collection_name**: Name of the ChromaDB collection
+  - Use different names for different document sets
+  - Default: `"product_docs"`
+
+- **persist_dir**: Directory for ChromaDB persistence
+  - ChromaDB stores all data here
+  - Default: `"./chroma_db"`
+  - Add to `.gitignore`
+
+- **n_results**: Number of results to retrieve in queries
+  - Too low: might miss relevant context
+  - Too high: might include irrelevant noise
+  - Recommended: 3-7 for most RAG use cases
+
+- **model**: Embedding model name
+  - Must be consistent between indexing and querying
+  - Default: `"nomic-embed-text"` (768 dimensions)
+  - Alternative: `"mxbai-embed-large"` (1024 dimensions, better quality)
+
+### Distance Interpretation
+
+Query results include a `distance` score:
+- **< 0.5**: Strong semantic match (highly relevant)
+- **0.5 - 1.0**: Moderate match (potentially useful)
+- **> 1.0**: Weak match (consider filtering out)
+
 ## Data Directories
 
 - `data_raw/`: Place raw PDF files here (ignored by git)
 - `data_processed/`: Output markdown files (ignored by git)
 - `json_chunks/`: Generated JSONL chunks (ignored by git)
+- `chroma_db/`: ChromaDB vector store persistence (ignored by git, auto-created)
 
 ## Dependencies
 
+### Python Packages
+
 - **pdfminer-six** (≥20260107): PDF text extraction
+- **ollama** (≥0.4.7): Local embedding generation
+- **chromadb** (≥0.5.0): Vector store for semantic search
 - **cffi**, **cryptography**, **charset-normalizer**, **pycparser**: Transitive dependencies
+
+### External Services
+
+- **Ollama** (local): Download from [ollama.ai](https://ollama.ai/)
+  - Required for embedding generation
+  - Pull embedding model: `ollama pull nomic-embed-text`
 
 See `requirements.txt` for exact versions.
 
 ## Roadmap
 
 - [x] **Embeddings Module**: Local embedding generation via Ollama (`nomic-embed-text` / `mxbai-embed-large`)
-- [ ] **Vector Store**: FAISS or Pinecone integration
+- [x] **Vector Store**: ChromaDB integration with persistent storage
 - [ ] **LangChain Integration**: Seamless RAG pipeline
 - [ ] **Enhanced CLI**: Command-line interface for batch processing
 - [ ] **Web API**: FastAPI endpoint for document processing
@@ -245,9 +365,9 @@ See `requirements.txt` for exact versions.
 ## Known Issues & TODOs
 
 1. **main.py**: Currently a draft version - see inline TODOs
-2. **vectorstore.py**: Placeholder module - implementation pending
-3. **Error Handling**: Consider adding more robust error handling for edge cases
-4. **Type Hints**: Could be enhanced with more specific return types
+2. **Error Handling**: Consider adding more robust error handling for edge cases
+3. **Type Hints**: Could be enhanced with more specific return types
+4. **ChromaDB**: Add `chroma_db/` to `.gitignore` if not already present
 
 ## Contributing
 
@@ -285,5 +405,5 @@ For questions or support, please contact the project maintainer.
 
 ---
 
-**Last Updated**: April 2026
+**Last Updated**: May 2026
 
