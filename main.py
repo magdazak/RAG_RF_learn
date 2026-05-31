@@ -30,6 +30,10 @@ import logging
 
 logging.basicConfig(level=logging.INFO)
 
+# Suppress httpx INFO logs unless in debug mode
+if logging.getLogger().level > logging.DEBUG:
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+
 def run_pipeline(pdf_path: str):
     """
     Run the RAG pipeline: markdown chunking + JSONL saving.

@@ -11,6 +11,7 @@ Recommended models (pull first with `ollama pull <model>`):
 import logging
 from typing import List, Dict
 import ollama
+import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -58,10 +59,16 @@ def embed_chunks(
     total = len(chunks)
     logger.info("Embedding %d chunk(s) with model '%s' ...", total, model)
 
+    time_start = datetime.datetime.now()
+    logger.debug("Started embedding at %s", time_start.strftime("%Y-%m-%d %H:%M:%S"))
+
     for i, chunk in enumerate(chunks, start=1):
         text = chunk.get("text", "")
         chunk["embedding"] = get_embedding(text, model=model)
         logger.debug("  [%d/%d] embedded heading='%s' (%d chars)", i, total, chunk.get("heading"), len(text))
 
-    logger.info("Embedding complete.")
+    time_end = datetime.datetime.now()
+    logger.debug("Finished embedding at %s", time_end.strftime("%Y-%m-%d %H:%M:%S"))
+    embed_time = time_end - time_start
+    logger.info("Embedding complete in %s seconds.", embed_time.seconds)
     return chunks
