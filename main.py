@@ -25,6 +25,7 @@ from src.data_extract.markdown_converter import pdf_text_to_markdown
 from src.rag.chunking import markdown_chunker
 from src.rag.chunking_utils import save_chunks_to_jsonl
 from src.rag.embeddings import embed_chunks
+from src.rag.vectorstore import build_vectorstore
 import os
 import logging
 
@@ -95,8 +96,16 @@ def run_pipeline(pdf_path: str):
     save_chunks_to_jsonl(embedded_chunks, embedded_jsonl_path)
     logging.info(f"✓ Saved {len(embedded_chunks)} embedded chunks to {embedded_jsonl_path}")
 
+    # 6. Store embedded chunks in ChromaDB - NOTE: NOT TESTED YET, ensure ChromaDB is running and configured properly before using!
+    logging.info("=" * 50)
+    build_vectorstore(
+        embedded_chunks,
+        collection_name="product_docs",
+        persist_dir="./chroma_db"
+    )
+
 if __name__ == "__main__":
-    # file_to_convert = "sample_final_part_1.pdf"
+    # file_to_convert = "sample.pdf"
     file_to_convert = "BackupTool.pdf"
 
     run_pipeline(
