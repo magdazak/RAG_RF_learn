@@ -451,8 +451,8 @@ If the memory is weak, the reasoning collapses.
 - [x] Implement `build_vectorstore()`
 - [x] Implement `query_vectorstore()`
 - [x] Test with sample queries
-- [ ] Add to `.gitignore`: `chroma_db/`
-- [ ] Wire into `main.py` pipeline
+- [x] Add to `.gitignore`: `chroma_db/`
+- [x] Wire into `main.py` pipeline
 - [ ] Integrate with LLM for full RAG
 - [ ] Add monitoring/logging for retrieval quality
 - [ ] Document usage examples

@@ -4,6 +4,11 @@ Vector store module for storing and querying embeddings using ChromaDB.
 Exposes two main functions:
   - build_vectorstore()  : persist embedded chunks to a local ChromaDB collection
   - query_vectorstore()  : embed a query and retrieve the top-k similar chunks
+
+This code is using ChromaDB in persistent client mode, meaning:
+1. No separate server needed - ChromaDB runs embedded in your Python application
+2. Automatic start - It starts when you run main.py
+3. Local storage - Data persists to the ./chroma_db directory
 """
 
 import logging
