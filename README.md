@@ -504,9 +504,18 @@ See `requirements.txt` for exact versions.
 
 ## Known Issues & TODOs
 
-1. **Error Handling**: Could be enhanced for edge cases (malformed PDFs, network issues)
-2. **Type Hints**: Could be enhanced with more specific return types
-3. **Batch Processing**: Add support for processing multiple PDFs in one command
+1. **Improve text cleaning**: ex. for 'NET_APP user guides' - remove page numbers, fix hyphenation, normalize whitespace:
+```commandline
+102                                                                                                                                                                                                                                 
+
+02/2021                                                                                                                                                                                                                             
+
+Product Portal      
+```
+2. **Improve responses**: Queries return relevant chunks - change it to return more concise answers based on the chunks (e.g. using a local LLM for generation)
+3. **Error Handling**: Could be enhanced for edge cases (malformed PDFs, network issues)
+4. **Type Hints**: Could be enhanced with more specific return types
+5. **Batch Processing**: Add support for processing multiple PDFs in one command
 
 ## Contributing
 
