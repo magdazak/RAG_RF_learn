@@ -6,7 +6,32 @@ This document explains both the theory and the **practical ChromaDB implementati
 
 ---
 
-## 🧠 Core takeaway  
+## 📋 Quick Reference
+
+### Installation
+
+```powershell
+pip install chromadb
+# or using uv
+uv pip install chromadb
+```
+
+Add to `requirements.txt`:
+```
+chromadb>=0.5.0
+```
+
+> **⚖️ Installation Size:** ChromaDB pulls in ~60 transitive dependencies totaling approximately ~189 MB on disk. Main contributors:
+> - `chromadb_rust_bindings` (~60 MB) — Compiled Rust core
+> - `onnxruntime` (~36 MB) — Built-in embeddings engine (not used since we use Ollama)
+> - `numpy` + `numpy.libs` (~39 MB) — Numerical arrays
+> - `kubernetes` (~16 MB) — Client-server mode support (not needed locally)
+> 
+> Note: `onnxruntime` is only invoked when ChromaDB generates embeddings internally. Since this project uses **pre-computed embeddings from Ollama**, onnxruntime is not utilized.
+
+---
+
+## 🧠 Core takeaway
 A **vector store** is essential in RAG because it enables **semantic search** over your knowledge base, letting the system retrieve the most relevant chunks of information based on *meaning*, not keywords. This retrieval step directly affects **accuracy**, **latency**, and **scalability** of your RAG pipeline.
 
 ---
@@ -29,7 +54,24 @@ A **vector store** is essential in RAG because it enables **semantic search** ov
 - ✅ **Auto-persistent** — survives restarts without manual save/load (unlike FAISS)
 - ✅ **Metadata filtering** — can filter chunks by `heading` or other fields
 - ✅ **Simple Python API** — designed specifically for RAG use cases
-- ✅ **Works with custom embeddings** — accepts pre-computed Ollama vectors 
+- ✅ **Works with custom embeddings** — accepts pre-computed Ollama vectors
+
+**Comparison: ChromaDB vs FAISS**
+
+| Criteria | ChromaDB | FAISS |
+|---|---|---|
+| Local / no server | ✅ | ✅ |
+| Persistent on disk | ✅ native | ⚠️ manual save/load |
+| Metadata filtering | ✅ | ❌ |
+| Simple Python API | ✅ | ⚠️ lower-level |
+| Custom embeddings | ✅ | ✅ |
+
+ChromaDB is the better choice for this fully-local RAG pipeline:
+- Pure Python, no Docker or external server needed
+- Persists the index on disk automatically (survives restarts)
+- Supports **metadata filtering** (e.g. filter chunks by `heading`)
+- Designed exactly for RAG use cases
+- Works seamlessly with pre-computed embeddings from Ollama
 
 ---
 
@@ -276,6 +318,25 @@ If you update many PDFs, re-run the full pipeline to keep the vector store in sy
 
 ---
 
+## 🗂️ Directory Structure
+
+After implementing the vector store, the project structure includes:
+
+```
+LLM_Local/
+├── src/rag/
+│   ├── vectorstore.py       ← ChromaDB implementation
+│   ├── embeddings.py        ← Ollama embedding generation
+│   ├── chunking.py          ← Semantic chunking
+│   └── VECTORE_STORE.md     ← This documentation
+├── chroma_db/               ← Auto-created on first build
+│   └── <collection data>    ← Persistent vector storage
+├── main.py                  ← CLI entry point
+└── .gitignore               ← Must include chroma_db/
+```
+
+---
+
 ## 🔍 Vector Store Comparison
 
 Understanding why ChromaDB was chosen:
@@ -460,5 +521,35 @@ If the memory is weak, the reasoning collapses.
 ---
 
 **Status:** ✅ **Vector store implementation complete** (as of May 31, 2026)  
+**Updated:** June 7, 2026 — CLI integration completed  
 **Next milestone:** LangChain integration + LLM prompt construction
+
+---
+
+## 📝 Implementation History
+
+### Key Design Decisions
+
+| Decision | Choice | Reason |
+|---|---|---|
+| Vector DB | ChromaDB | Local, persistent, simple API |
+| Embedding model | `nomic-embed-text` (768-dim) | Already in use, fast, good quality |
+| Persist location | `./chroma_db/` | Relative to project root |
+| IDs | `chunk_{i}` | Simple, reproducible indexing |
+| Metadata stored | `heading` | Enables heading-level filtering |
+| Distance metric | Cosine (L2) | ChromaDB default; works well for text |
+
+### Implementation Steps Completed
+
+1. ✅ Installed ChromaDB (`chromadb>=0.5.0`)
+2. ✅ Implemented `build_vectorstore()` in `src/rag/vectorstore.py`
+3. ✅ Implemented `query_vectorstore()` with Ollama integration
+4. ✅ Integrated into `main.py` CLI with:
+   - `build` command for processing PDFs
+   - `query` command for semantic search
+   - `interactive` mode for Q&A sessions
+5. ✅ Added duplicate detection with `--force` override
+6. ✅ Tested with sample queries
+7. ✅ Added `chroma_db/` to `.gitignore`
+8. ✅ Documented in README.md
 
