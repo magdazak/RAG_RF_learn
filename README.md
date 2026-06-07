@@ -37,6 +37,12 @@ This project provides a complete pipeline for:
   - Semantic similarity search
   - Metadata filtering support
   - HNSW indexing for fast retrieval
+  - No separate server needed - runs embedded
+- 🎯 **Modern CLI**:
+  - Typer-powered command-line interface
+  - Three commands: `build`, `query`, `interactive`
+  - Duplicate detection with `--force` override
+  - Rich console output with colors and formatting
 - 💾 **JSONL Output**: Save chunks with heading context for RAG pipelines
 
 ## Project Structure
@@ -101,7 +107,100 @@ LLM_Local/
 
 ## Quick Start
 
-### Basic Usage Example
+### CLI Usage (Recommended)
+
+The project provides a modern CLI powered by **Typer** for easy interaction with the RAG pipeline.
+
+#### 1. Build Vector Store from PDF
+
+Process a PDF and build the vector store in one command:
+
+```bash
+python main.py build path/to/document.pdf
+```
+
+**Options:**
+```bash
+python main.py build document.pdf --help
+
+# Common options:
+--collection-name TEXT    # ChromaDB collection name (default: "product_docs")
+--persist-dir TEXT        # ChromaDB directory (default: "./chroma_db")
+--max-chunk-size INTEGER  # Max chunk size in chars (default: 1000)
+--overlap INTEGER         # Overlap between chunks (default: 100)
+--force / -f              # Force rebuild if already processed
+```
+
+**Duplicate Detection**: The CLI automatically detects if a PDF was already processed and prevents re-processing:
+
+```bash
+$ python main.py build document.pdf
+⚠ Warning: This PDF appears to have been processed already.
+Existing file: ./json_chunks/document_embedded.jsonl
+
+Use --force to rebuild:
+  python main.py build "document.pdf" --force
+```
+
+To force a rebuild:
+```bash
+python main.py build document.pdf --force
+```
+
+#### 2. Query the Vector Store
+
+Ask questions and get relevant chunks from your documents:
+
+```bash
+python main.py query "How do I reset a password?"
+```
+
+**Options:**
+```bash
+--collection-name TEXT    # Collection to query (default: "product_docs")
+--persist-dir TEXT        # ChromaDB directory (default: "./chroma_db")
+--n-results INTEGER       # Number of results (default: 5)
+--show-distance           # Show similarity scores
+```
+
+**Example with options:**
+```bash
+python main.py query "installation steps" --n-results 3 --show-distance
+```
+
+#### 3. Interactive Q&A Mode
+
+Start an interactive session to ask multiple questions:
+
+```bash
+python main.py interactive
+```
+
+```
+Interactive Q&A Mode
+Collection: 'product_docs' at './chroma_db'
+Type 'quit' or 'exit' to stop.
+
+❓ Your question: How do I configure the system?
+[Shows top 3 relevant chunks...]
+
+❓ Your question: What are the prerequisites?
+[Shows top 3 relevant chunks...]
+
+❓ Your question: quit
+Goodbye!
+```
+
+**Options:**
+```bash
+--collection-name TEXT  # Collection to query (default: "product_docs")
+--persist-dir TEXT      # ChromaDB directory (default: "./chroma_db")
+--n-results INTEGER     # Results per query (default: 3)
+```
+
+### Programmatic Usage (Python API)
+
+For advanced use cases, you can use the Python API directly:
 
 ```python
 from src.data_extract.pdf_loader import load_pdf
@@ -147,13 +246,51 @@ for result in results:
     print(f"Text: {result['text'][:200]}...\n")
 ```
 
-### Running the Pipeline
+## CLI Examples
 
+### Common Workflows
+
+**1. Process a new PDF document:**
 ```bash
-python main.py
+python main.py build "C:/Documents/UserManual.pdf"
 ```
 
-**Note**: `main.py` is currently a draft. Review TODOs and adjust file paths as needed.
+**2. Process with custom chunking parameters:**
+```bash
+python main.py build document.pdf --max-chunk-size 1500 --overlap 150
+```
+
+**3. Query your documents:**
+```bash
+python main.py query "How do I install the software?"
+```
+
+**4. Get more detailed results:**
+```bash
+python main.py query "configuration options" --n-results 10 --show-distance
+```
+
+**5. Use multiple collections for different document sets:**
+```bash
+# Build a collection for technical docs
+python main.py build tech_manual.pdf --collection-name tech_docs
+
+# Build a collection for user guides
+python main.py build user_guide.pdf --collection-name user_docs
+
+# Query specific collection
+python main.py query "API endpoints" --collection-name tech_docs
+```
+
+**6. Force rebuild after document update:**
+```bash
+python main.py build updated_manual.pdf --force
+```
+
+**7. Interactive exploration:**
+```bash
+python main.py interactive --n-results 5
+```
 
 ## API Reference
 
@@ -341,6 +478,8 @@ Query results include a `distance` score:
 - **pdfminer-six** (≥20260107): PDF text extraction
 - **ollama** (≥0.4.7): Local embedding generation
 - **chromadb** (≥0.5.0): Vector store for semantic search
+- **typer** (≥0.25.1): Modern CLI framework
+- **rich** (≥15.0.0): Rich terminal output formatting
 - **cffi**, **cryptography**, **charset-normalizer**, **pycparser**: Transitive dependencies
 
 ### External Services
@@ -355,8 +494,9 @@ See `requirements.txt` for exact versions.
 
 - [x] **Embeddings Module**: Local embedding generation via Ollama (`nomic-embed-text` / `mxbai-embed-large`)
 - [x] **Vector Store**: ChromaDB integration with persistent storage
+- [x] **CLI Interface**: Typer-based CLI with build, query, and interactive modes
+- [x] **Duplicate Detection**: Automatic detection of already-processed PDFs
 - [ ] **LangChain Integration**: Seamless RAG pipeline
-- [ ] **Enhanced CLI**: Command-line interface for batch processing
 - [ ] **Web API**: FastAPI endpoint for document processing
 - [ ] **Docker Support**: Containerized deployment
 - [ ] **Testing Suite**: Unit and integration tests
@@ -364,10 +504,9 @@ See `requirements.txt` for exact versions.
 
 ## Known Issues & TODOs
 
-1. **main.py**: Currently a draft version - see inline TODOs
-2. **Error Handling**: Consider adding more robust error handling for edge cases
-3. **Type Hints**: Could be enhanced with more specific return types
-4. **ChromaDB**: Add `chroma_db/` to `.gitignore` if not already present
+1. **Error Handling**: Could be enhanced for edge cases (malformed PDFs, network issues)
+2. **Type Hints**: Could be enhanced with more specific return types
+3. **Batch Processing**: Add support for processing multiple PDFs in one command
 
 ## Contributing
 
@@ -405,5 +544,5 @@ For questions or support, please contact the project maintainer.
 
 ---
 
-**Last Updated**: May 2026
+**Last Updated**: June 7, 2026
 
