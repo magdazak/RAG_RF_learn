@@ -101,7 +101,21 @@ PDF Documents
                                     ▲
                       Query with natural language
                                     │
-              Top-k similar chunks ──► Inject into LLM prompt ──► Answer
+              Top-k similar chunks ──► Optional: Web Search (web_search.py)
+                                              • DuckDuckGo API
+                                              • Privacy warnings
+                                              • Opt-in only
+                                                    │
+                                        Combined context (local + web)
+                                                    │
+                                                    ▼
+                                        LLM Answer Generation
+                                              • Model: llama3.1:8b
+                                              • Local Ollama inference
+                                              • Concise synthesis
+                                                    │
+                                                    ▼
+                                              Final Answer
 ```
 
 ### Data Structure
@@ -147,7 +161,7 @@ build_vectorstore(
 
 ---
 
-### 2. **Querying the Vector Store**
+### 2. **Querying the Vector Store (Raw Chunks)**
 
 ```python
 from src.rag.vectorstore import query_vectorstore
@@ -175,7 +189,52 @@ results = query_vectorstore(
 
 ---
 
-### 3. **Advanced: Metadata Filtering** (Future Extension)
+### 3. **Query + Answer Generation (Recommended)**
+
+```python
+from src.rag.vectorstore import query_and_generate
+
+# Get a concise answer synthesized from retrieved chunks
+answer = query_and_generate(
+    query_text="How do I reset a user password?",
+    collection_name="product_docs",
+    persist_dir="./chroma_db",
+    n_results=5,                      # Chunks to retrieve for context
+    embed_model="nomic-embed-text",   # Embedding model
+    generation_model="llama3.1:8b",   # LLM for answer synthesis
+    use_web_search=False              # Optional: augment with web results
+)
+
+print(answer)
+# Output: "To reset a user password, navigate to the User Management 
+#          section and click on 'Reset Password'..."
+```
+
+**Features:**
+- Retrieves top-k chunks from ChromaDB
+- Optionally augments with DuckDuckGo web search
+- Synthesizes coherent answer using local LLM (llama3.1:8b)
+- 100% local processing (unless web search enabled)
+
+**Web Search Option:**
+```python
+# ⚠️ Privacy warning: Sends query to DuckDuckGo servers
+answer = query_and_generate(
+    query_text="What are OAuth 2.0 best practices?",
+    use_web_search=True  # Combines local docs + web results
+)
+```
+
+When `use_web_search=True`:
+- ⚠️ Query is sent to DuckDuckGo servers
+- Local documents are searched first
+- Web results added as supplementary context
+- Answer labels sources (local vs web)
+- **Do NOT use** for sensitive/internal questions
+
+---
+
+### 4. **Advanced: Metadata Filtering** (Future Extension)
 
 ChromaDB supports filtering by metadata:
 ```python
@@ -190,7 +249,7 @@ This can improve precision when you know the query domain upfront.
 
 ---
 
-## 🚀 Why this step is so important
+## 🚀 Why this implementation is important
 
 ### 1. **It determines the accuracy of your RAG answers**  
 If the vector store retrieves irrelevant or low‑quality chunks, the LLM will produce weak or hallucinated answers.  
@@ -200,6 +259,8 @@ RAG systems can improve factual accuracy from **70% → 95%+** when retrieval is
 - Semantic chunking preserves context (keeps headings with related content)
 - `nomic-embed-text` is optimized for retrieval tasks
 - Distance-sorted results ensure the best matches come first
+- **Local LLM synthesis** (`llama3.1:8b`) creates coherent answers from chunks
+- Optional web search provides supplementary context when needed
 
 ### 2. **It controls latency — how fast your app feels**  
 A slow vector store becomes a bottleneck. Searching millions of embeddings can take *hundreds of milliseconds* if poorly optimized, delaying the entire response. 
@@ -208,17 +269,19 @@ A slow vector store becomes a bottleneck. Searching millions of embeddings can t
 - ChromaDB uses **HNSW** (Hierarchical Navigable Small World) index → sublinear search time
 - Local storage eliminates network latency
 - Expected retrieval time: **10–50 ms** for thousands of chunks (single-machine)
+- Local LLM adds ~2-5 seconds for answer generation (acceptable for interactive use)
 
-### 3. **It affects throughput — how many users you can serve**  
-Under load, an inefficient vector store can exhaust CPU/memory and cause timeouts. High‑traffic apps (support bots, search tools) depend on vector stores that scale horizontally. 
+### 3. **Privacy and data control**
+Your documents never leave your machine (unless web search explicitly enabled).
 
 **In this implementation:**
-- Disk persistence keeps memory footprint low (only active queries load into RAM)
-- Suitable for **single-user or small-team** workloads
-- For production scale, consider migrating to Qdrant, Weaviate, or managed Pinecone
+- ✅ 100% local processing (embeddings, storage, LLM generation)
+- ✅ No cloud API calls to OpenAI/Anthropic/Cohere
+- ✅ Your documents stay on your machine
+- ⚠️ Optional web search sends queries to DuckDuckGo (opt-in with warnings)
 
 ### 4. **It enables domain‑specific expertise**  
-Your private or specialized data lives *outside* the LLM — in the vector store.  
+Your private or specialized data lives *outside* the LLM — in the vector store.
 This is how RAG turns a general model into an expert in your domain (legal, medical, internal docs, etc.).
 
 **In this implementation:**
@@ -244,10 +307,49 @@ This is cheaper and 10–50× more efficient than retraining.
 3. **Store embeddings in vector DB** → `src/rag/vectorstore.py` (ChromaDB) ← **current module**
 4. **Embed the user query** → `query_vectorstore()` (same model as step 2)
 5. **Retrieve top‑k similar vectors** → ChromaDB similarity search
-6. **Inject them into the LLM prompt** → *(next step: LangChain integration)*
-7. **Generate grounded output** → *(next step: LLM inference)*
+6. **Optional: Augment with web search** → `src/rag/web_search.py` (DuckDuckGo)
+7. **Generate answer with LLM** → `query_and_generate()` (Ollama + llama3.1:8b)
+8. **Return concise answer** → Synthesized from retrieved chunks + optional web results
 
-The quality of step 3 determines the quality of steps 5–7.
+The quality of step 3 determines the quality of steps 5–8.
+
+---
+
+## 🎯 CLI Integration
+
+The vector store is seamlessly integrated into the CLI:
+
+### Build Command
+```bash
+python main.py build document.pdf
+```
+- Processes PDF → Markdown → Chunks → Embeddings → ChromaDB
+- Auto-detects duplicates with `--force` override
+
+### Query Command (with Answer Generation)
+```bash
+python main.py query "How do I reset a password?"
+```
+- Retrieves top-5 chunks from ChromaDB
+- Synthesizes concise answer using llama3.1:8b
+- 100% local processing
+
+### Query with Web Search
+```bash
+# ⚠️ Privacy warning displayed automatically
+python main.py query "What are OAuth best practices?" --web-search
+```
+- Searches ChromaDB first
+- Augments with DuckDuckGo results
+- Clearly labels sources in answer
+
+### Interactive Mode
+```bash
+python main.py interactive
+```
+- Multi-question session
+- Each query: retrieval → generation → answer
+- Type 'quit' to exit
 
 ---
 
@@ -257,11 +359,13 @@ The quality of step 3 determines the quality of steps 5–7.
 
 | Parameter | Default | Tuning Guidance |
 |---|---|---|
-| `n_results` | 5 | Too low → misses context; too high → noise. Start with 3–7. |
+| `n_results` | 5 (query), 3 (interactive) | Too low → misses context; too high → noise. Start with 3–7. |
 | `persist_dir` | `./chroma_db/` | Use absolute path for production; add to `.gitignore`. |
 | `collection_name` | `product_docs` | Change per knowledge domain (e.g., `legal_docs`, `api_specs`). |
-| Embedding model | `nomic-embed-text` | Must match between `build_vectorstore()` and `query_vectorstore()`. |
+| Embedding model | `nomic-embed-text` | Must match between indexing and querying. |
+| Generation model | `llama3.1:8b` | Swap with `mistral` or other Ollama models via `--model` flag. |
 | Distance metric | Cosine (L2) | ChromaDB default; cosine works well for text embeddings. |
+| Web search | Disabled | Enable with `--web-search` flag (privacy warnings apply). |
 
 ### Storage Size Estimates
 
@@ -275,13 +379,15 @@ ChromaDB also stores index structures (HNSW graph), adding ~20–30% overhead.
 
 ### Performance Benchmarks (Approximate)
 
-| Collection Size | Index Build Time | Query Latency | RAM Usage |
-|---|---|---|---|
-| 1,000 chunks | <1 second | 5–10 ms | ~50 MB |
-| 10,000 chunks | 5–10 seconds | 10–30 ms | ~200 MB |
-| 100,000 chunks | 1–2 minutes | 30–80 ms | ~1 GB |
+| Collection Size | Index Build Time | Query Latency | Answer Generation | Total Time | RAM Usage |
+|---|---|---|---|---|---|
+| 1,000 chunks | <1 second | 5–10 ms | 2–4 seconds | ~2–4 sec | ~50 MB |
+| 10,000 chunks | 5–10 seconds | 10–30 ms | 2–4 seconds | ~2–4 sec | ~200 MB |
+| 100,000 chunks | 1–2 minutes | 30–80 ms | 2–4 seconds | ~2–5 sec | ~1 GB |
 
-*Tested on mid-range CPU (Intel i5/i7); your mileage may vary.*
+*Tested on mid-range CPU (Intel i5/i7); LLM generation time depends on GPU/CPU performance.*
+
+**Note:** Most latency in query mode comes from LLM answer generation (~2-5 seconds), not vector search (<100ms).
 
 ---
 
@@ -304,6 +410,18 @@ Filtering by `heading` or other metadata can improve precision but reduces recal
 ### 5. **Rebuild the index when documents change significantly**
 If you update many PDFs, re-run the full pipeline to keep the vector store in sync.
 
+### 6. **Web search privacy**
+- ⚠️ Only enable `--web-search` for generic, public questions
+- Never use for internal/confidential queries
+- Queries are sent to DuckDuckGo servers when enabled
+- Disabled by default for privacy
+
+### 7. **Choose the right generation model**
+- `llama3.1:8b` (default) - Good balance of speed and quality
+- `mistral` - Faster, slightly lower quality
+- `llama2` - Alternative general-purpose model
+- Use `--model` flag to experiment
+
 ---
 
 ## 📊 Summary table
@@ -315,6 +433,8 @@ If you update many PDFs, re-run the full pipeline to keep the vector store in sy
 | **Indexing algorithms** | Speed up search | Controls latency & scalability | HNSW (sublinear search time) |
 | **Filtering & metadata** | Narrow search space | Improves precision | `heading` field stored per chunk |
 | **Embedding model** | Converts text to vectors | Determines semantic quality | Ollama `nomic-embed-text` (768-dim) |
+| **Answer generation** | Synthesizes retrieved chunks | Creates coherent responses | Ollama `llama3.1:8b` (local) |
+| **Web augmentation** | Supplements local knowledge | Fills information gaps | DuckDuckGo (opt-in, privacy warnings) |
 
 ---
 
@@ -325,9 +445,10 @@ After implementing the vector store, the project structure includes:
 ```
 LLM_Local/
 ├── src/rag/
-│   ├── vectorstore.py       ← ChromaDB implementation
+│   ├── vectorstore.py       ← ChromaDB + answer generation
 │   ├── embeddings.py        ← Ollama embedding generation
 │   ├── chunking.py          ← Semantic chunking
+│   ├── web_search.py        ← Optional DuckDuckGo integration
 │   └── VECTORE_STORE.md     ← This documentation
 ├── chroma_db/               ← Auto-created on first build
 │   └── <collection data>    ← Persistent vector storage
