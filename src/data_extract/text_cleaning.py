@@ -8,7 +8,9 @@ import re
 def normalize_text(text: str) -> str:
     """
     Cleans and normalizes extracted text by:
-    - Removing page numbers (e.g., 'Page 1', 'Page 1/10')
+    - Removing page numbers (e.g., 'Page 1', 'Page 1/10', '102 - ex.')
+    - Removing dates (e.g., '02/2021')
+    - Removing app/system names (e.g., 'Product Portal')
     - Joining hyphenated words split across lines
     - Reducing multiple blank lines to a maximum of two
     - Replacing single newlines (not part of a paragraph break) with spaces
@@ -22,6 +24,15 @@ def normalize_text(text: str) -> str:
 
     # Remove page numbers like 'Page 1' or 'Page 1/10'
     text = re.sub(r"Page\s*\d+(\s*/\s*\d+)?", "", text, flags=re.IGNORECASE)
+
+    # Remove standalone page numbers (sole digits on a line, typically in footer)
+    text = re.sub(r"^\s*\d+\s*$", "", text, flags=re.MULTILINE)
+
+    # Remove dates in MM/YYYY format (e.g., '02/2021')
+    text = re.sub(r"\b\d{1,2}/\d{4}\b", "", text)
+
+    # Remove app/system names like 'Product Portal'
+    text = re.sub(r"^[A-Z][A-Z\s/@\d]*$", "", text, flags=re.MULTILINE)
 
     # Join hyphenated words split across lines
     text = re.sub(r"(\w+)-\n(\w+)", r"\1\2", text)
