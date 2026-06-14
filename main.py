@@ -10,6 +10,21 @@ EXAMPLES:
   python main.py build path/to/document.pdf
   python main.py query "How do I configure the system?"
   python main.py interactive
+  
+  # Use web search to augment answers (⚠️ sends query to DuckDuckGo)
+  python main.py query "How does OAuth work?" --web-search
+  python main.py interactive --web-search
+
+WEB SEARCH:
+  The --web-search flag augments answers with information from the internet.
+  
+  ⚠️ PRIVACY WARNING:
+  - Your query is sent to DuckDuckGo servers
+  - Do NOT use if your questions contain sensitive/internal information
+  - Only use for generic, non-confidential questions
+  
+  Without --web-search: Answers come ONLY from your local documents
+  With --web-search:    Answers combine local docs + web results
 """
 
 import os
@@ -123,39 +138,50 @@ def query(
     collection_name: str = typer.Option("product_docs", help="ChromaDB collection name"),
     persist_dir: str = typer.Option("./chroma_db", help="ChromaDB persistence directory"),
     n_results: int = typer.Option(5, help="Number of results to return"),
-    show_distance: bool = typer.Option(False, help="Show similarity distances"),
+    model: str = typer.Option("llama3.1:8b", help="Ollama model for answer generation"),
+    web_search: bool = typer.Option(False, "--web-search", help="⚠️ Augment with web search (sends query to DuckDuckGo)"),
 ):
     """
-    Query the vector store with a question.
+    Query the vector store and generate a concise answer.
     
-    Returns the most relevant chunks from the document collection.
+    Retrieves relevant chunks from your local documents and synthesizes them 
+    into a direct answer using a local LLM (Ollama).
+    
+    \b
+    WEB SEARCH (--web-search):
+    ⚠️  WARNING: Sends your query to DuckDuckGo servers!
+    - Use ONLY for generic, non-sensitive questions
+    - Do NOT use if question contains internal/confidential information
+    - Augments local docs with internet search results
+    
+    \b
+    Examples:
+      python main.py query "How does JWT authentication work?"
+      python main.py query "What is OAuth 2.0?" --web-search
     """
-    # Import only when needed
-    from src.rag.vectorstore import query_vectorstore
+    from src.rag.vectorstore import query_and_generate
+    
+    # Display warning if web search is enabled
+    if web_search:
+        console.print("\n[bold yellow]⚠️  PRIVACY WARNING ⚠️[/bold yellow]")
+        console.print("[yellow]Web search is enabled. Your query will be sent to DuckDuckGo servers.[/yellow]")
+        console.print("[yellow]Do NOT use this if your question contains sensitive/internal information.[/yellow]\n")
     
     console.print(f"\n[bold cyan]Querying:[/bold cyan] {question}\n")
+    console.print(f"[bold cyan]Generating answer...[/bold cyan]\n")
     
-    results = query_vectorstore(
+    answer = query_and_generate(
         query_text=question,
         collection_name=collection_name,
         persist_dir=persist_dir,
         n_results=n_results,
+        generation_model=model,
+        use_web_search=web_search,
     )
     
-    if not results:
-        console.print("[yellow]No results found.[/yellow]\n")
-        return
-    
-    console.print(f"[bold green]Found {len(results)} relevant chunks:[/bold green]\n")
-    
-    for i, result in enumerate(results, 1):
-        console.print(f"[bold]Result {i}:[/bold]")
-        if result.get("heading"):
-            console.print(f"[dim]Section: {result['heading']}[/dim]")
-        if show_distance:
-            console.print(f"[dim]Distance: {result['distance']:.4f}[/dim]")
-        console.print(Markdown(result['text']))
-        console.print()
+    console.print(f"[bold green]Answer:[/bold green]\n")
+    console.print(answer)
+    console.print()
 
 
 @app.command()
@@ -163,19 +189,41 @@ def interactive(
     collection_name: str = typer.Option("product_docs", help="ChromaDB collection name"),
     persist_dir: str = typer.Option("./chroma_db", help="ChromaDB persistence directory"),
     n_results: int = typer.Option(3, help="Number of results per query"),
+    model: str = typer.Option("llama3.1:8b", help="Ollama model for answer generation"),
+    web_search: bool = typer.Option(False, "--web-search", help="⚠️ Augment with web search (sends query to DuckDuckGo)"),
 ):
     """
-    Interactive Q&A mode.
+    Interactive Q&A mode with answer generation.
     
-    Ask questions and get answers from the vector store in an interactive loop.
+    Ask questions in an interactive loop and get concise answers synthesized 
+    from your local documents using a local LLM (Ollama).
+    
     Type 'quit', 'exit', or press Ctrl+C to exit.
+    
+    \b
+    WEB SEARCH (--web-search):
+    ⚠️  WARNING: Sends ALL queries to DuckDuckGo servers!
+    - Use ONLY for generic, non-sensitive questions
+    - Do NOT use if questions contain internal/confidential information
+    - Augments local docs with internet search results
+    
+    \b
+    Examples:
+      python main.py interactive
+      python main.py interactive --web-search
     """
-    # Import only when needed
-    from src.rag.vectorstore import query_vectorstore
+    from src.rag.vectorstore import query_and_generate
     
     console.print("\n[bold cyan]Interactive Q&A Mode[/bold cyan]")
     console.print(f"Collection: '{collection_name}' at '{persist_dir}'")
-    console.print("Type 'quit' or 'exit' to stop.\n")
+    
+    # Display warning if web search is enabled
+    if web_search:
+        console.print("\n[bold yellow]⚠️  PRIVACY WARNING ⚠️[/bold yellow]")
+        console.print("[yellow]Web search is ENABLED. All queries will be sent to DuckDuckGo servers.[/yellow]")
+        console.print("[yellow]Do NOT ask questions containing sensitive/internal information.[/yellow]")
+    
+    console.print("\nType 'quit' or 'exit' to stop.\n")
     
     try:
         while True:
@@ -185,25 +233,18 @@ def interactive(
                 console.print("\n[yellow]Goodbye![/yellow]\n")
                 break
             
-            results = query_vectorstore(
+            console.print(f"\n[bold cyan]Generating answer...[/bold cyan]")
+            answer = query_and_generate(
                 query_text=question,
                 collection_name=collection_name,
                 persist_dir=persist_dir,
                 n_results=n_results,
+                generation_model=model,
+                use_web_search=web_search,
             )
             
-            if not results:
-                console.print("[yellow]No results found.[/yellow]")
-                continue
-            
-            console.print(f"\n[bold green]Top {len(results)} relevant chunks:[/bold green]\n")
-            
-            for i, result in enumerate(results, 1):
-                console.print(f"[bold]Result {i}:[/bold]")
-                if result.get("heading"):
-                    console.print(f"[dim]Section: {result['heading']}[/dim]")
-                console.print(Markdown(result['text']))
-                console.print()
+            console.print(f"\n[bold green]Answer:[/bold green]")
+            console.print(answer)
                 
     except (KeyboardInterrupt, EOFError):
         console.print("\n\n[yellow]Goodbye![/yellow]\n")

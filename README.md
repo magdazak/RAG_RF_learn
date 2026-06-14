@@ -1,6 +1,6 @@
 # LLM Local
 
-A local RAG (Retrieval Augmented Generation) pipeline for processing PDF documents into chunked, markdown-formatted content suitable for vector databases and language model integration.
+A local RAG (Retrieval Augmented Generation) pipeline for processing PDF documents and querying them using local LLMs. Converts PDFs to vector embeddings and generates concise answers using Ollama.
 
 ## Overview
 
@@ -11,13 +11,16 @@ This project provides a complete pipeline for:
 3. **Semantic Chunking**: Split Markdown content into semantically meaningful chunks
 4. **Embedding Generation**: Generate vector embeddings using local Ollama models
 5. **Vector Storage**: Persist embeddings in ChromaDB for semantic search
-6. **Output Generation**: Save chunks as JSONL files for downstream processing
+6. **Answer Generation**: Synthesize concise answers from retrieved chunks using local LLMs
+7. **Optional Web Search**: Augment answers with internet search (privacy-aware)
 
 ## Features
 
 - 📄 **PDF Text Extraction** using `pdfminer-six`
 - 🧹 **Intelligent Text Cleaning**:
-  - Page number removal
+  - Page number removal (footer numbers, "Page X" patterns)
+  - Date removal (MM/YYYY format)
+  - App/system name filtering (all-caps lines)
   - Hyphenation fixing
   - Whitespace normalization
 - 📝 **Markdown Conversion**:
@@ -38,6 +41,14 @@ This project provides a complete pipeline for:
   - Metadata filtering support
   - HNSW indexing for fast retrieval
   - No separate server needed - runs embedded
+- 🤖 **Answer Generation**:
+  - Local LLM synthesis using Ollama (llama3.1:8b)
+  - Concise, coherent answers from retrieved chunks
+  - No external API calls - 100% local
+- 🌐 **Optional Web Search**:
+  - DuckDuckGo integration for internet augmentation
+  - Privacy warnings and opt-in only
+  - Clear labeling of local vs web sources
 - 🎯 **Modern CLI**:
   - Typer-powered command-line interface
   - Three commands: `build`, `query`, `interactive`
@@ -56,13 +67,14 @@ LLM_Local/
 │   │   ├── pdf_loader.py         # PDF text extraction
 │   │   ├── markdown_converter.py  # Text to Markdown conversion
 │   │   └── text_cleaning.py      # Text normalization & formatting
-│   └── rag/                        # Document chunking for RAG
+│   └── rag/                        # RAG pipeline components
 │       ├── __init__.py
 │       ├── chunking.py            # Markdown-aware chunking logic
 │       ├── chunking_utils.py      # JSONL save utilities
 │       ├── embeddings.py          # Embedding generation via local Ollama
-│       └── vectorstore.py         # ChromaDB vector store integration
-├── main.py                         # Pipeline orchestration (draft)
+│       ├── vectorstore.py         # ChromaDB + answer generation
+│       └── web_search.py          # Optional web search (DuckDuckGo)
+├── main.py                         # CLI application
 ├── pyproject.toml                  # Project metadata & dependencies
 ├── requirements.txt                # Dependency pinning
 ├── .gitignore                      # Git ignore rules
@@ -75,8 +87,9 @@ LLM_Local/
 ### Prerequisites
 - Python 3.12+
 - pip or uv package manager
-- **Ollama** (for embeddings) - [Install Ollama](https://ollama.ai/)
+- **Ollama** (for embeddings and generation) - [Install Ollama](https://ollama.ai/)
   - Pull the embedding model: `ollama pull nomic-embed-text`
+  - Pull the generation model: `ollama pull llama3.1:8b`
 
 ### Setup
 
@@ -149,24 +162,41 @@ python main.py build document.pdf --force
 
 #### 2. Query the Vector Store
 
-Ask questions and get relevant chunks from your documents:
+Ask questions and get AI-generated answers from your documents:
 
 ```bash
 python main.py query "How do I reset a password?"
 ```
 
+This retrieves relevant chunks from your local documents and synthesizes a concise answer using **llama3.1:8b**.
+
 **Options:**
 ```bash
 --collection-name TEXT    # Collection to query (default: "product_docs")
 --persist-dir TEXT        # ChromaDB directory (default: "./chroma_db")
---n-results INTEGER       # Number of results (default: 5)
---show-distance           # Show similarity scores
+--n-results INTEGER       # Number of chunks to retrieve (default: 5)
+--model TEXT              # Ollama model for generation (default: "llama3.1:8b")
+--web-search              # ⚠️ Augment with web search (sends query to DuckDuckGo)
 ```
 
 **Example with options:**
 ```bash
-python main.py query "installation steps" --n-results 3 --show-distance
+python main.py query "What is OAuth 2.0?" --n-results 3 --model mistral
 ```
+
+**Web Search (Privacy Warning):**
+```bash
+# ⚠️ WARNING: Sends your query to DuckDuckGo servers
+# Only use for generic, non-sensitive questions
+python main.py query "What are JWT best practices?" --web-search
+```
+
+When `--web-search` is enabled:
+- ✅ Your local documents are searched first
+- ✅ Web results are added as supplementary context
+- ✅ Answer clearly indicates sources (local docs vs web)
+- ⚠️ **Privacy risk**: Query text is sent to DuckDuckGo
+- ⚠️ **DO NOT use** for internal/confidential questions
 
 #### 3. Interactive Q&A Mode
 
@@ -182,10 +212,20 @@ Collection: 'product_docs' at './chroma_db'
 Type 'quit' or 'exit' to stop.
 
 ❓ Your question: How do I configure the system?
-[Shows top 3 relevant chunks...]
+
+Generating answer...
+
+Answer:
+To configure the system, navigate to Settings > Configuration...
+[AI-generated concise answer based on your documents]
 
 ❓ Your question: What are the prerequisites?
-[Shows top 3 relevant chunks...]
+
+Generating answer...
+
+Answer:
+The prerequisites include Python 3.12+, Ollama...
+[AI-generated concise answer]
 
 ❓ Your question: quit
 Goodbye!
@@ -196,6 +236,14 @@ Goodbye!
 --collection-name TEXT  # Collection to query (default: "product_docs")
 --persist-dir TEXT      # ChromaDB directory (default: "./chroma_db")
 --n-results INTEGER     # Results per query (default: 3)
+--model TEXT            # Ollama model (default: "llama3.1:8b")
+--web-search            # ⚠️ Enable web search (privacy warning applies)
+```
+
+**Interactive with web search:**
+```bash
+# ⚠️ WARNING: ALL queries in this session will be sent to DuckDuckGo
+python main.py interactive --web-search
 ```
 
 ### Programmatic Usage (Python API)
@@ -208,7 +256,7 @@ from src.data_extract.markdown_converter import pdf_text_to_markdown
 from src.rag.chunking import markdown_chunker
 from src.rag.chunking_utils import save_chunks_to_jsonl
 from src.rag.embeddings import embed_chunks
-from src.rag.vectorstore import build_vectorstore, query_vectorstore
+from src.rag.vectorstore import build_vectorstore, query_and_generate
 
 # 1. Extract text from PDF
 pdf_path = "path/to/document.pdf"
@@ -233,17 +281,16 @@ build_vectorstore(
     persist_dir="./chroma_db"
 )
 
-# 7. Query the vector store
-results = query_vectorstore(
+# 7. Query and generate answer
+answer = query_and_generate(
     query_text="How do I reset a password?",
     collection_name="my_docs",
-    n_results=5
+    n_results=5,
+    generation_model="llama3.1:8b",
+    use_web_search=False  # Set to True to enable web search
 )
 
-for result in results:
-    print(f"Distance: {result['distance']:.3f}")
-    print(f"Heading: {result['heading']}")
-    print(f"Text: {result['text'][:200]}...\n")
+print(answer)
 ```
 
 ## CLI Examples
@@ -265,9 +312,10 @@ python main.py build document.pdf --max-chunk-size 1500 --overlap 150
 python main.py query "How do I install the software?"
 ```
 
-**4. Get more detailed results:**
+**4. Query with web search augmentation:**
 ```bash
-python main.py query "configuration options" --n-results 10 --show-distance
+# ⚠️ Only for generic questions - sends query to DuckDuckGo
+python main.py query "What are OAuth 2.0 best practices?" --web-search
 ```
 
 **5. Use multiple collections for different document sets:**
@@ -290,6 +338,11 @@ python main.py build updated_manual.pdf --force
 **7. Interactive exploration:**
 ```bash
 python main.py interactive --n-results 5
+```
+
+**8. Interactive with different LLM model:**
+```bash
+python main.py interactive --model mistral
 ```
 
 ## API Reference
@@ -320,9 +373,14 @@ Converts raw text to Markdown format.
 
 #### Text Cleaning Functions
 
-- `normalize_text(text: str) -> str`: Normalize text (remove page numbers, fix hyphens)
+- `normalize_text(text: str) -> str`: Normalize text (remove page numbers, dates, app names, fix hyphens)
 - `convert_lists(text: str) -> str`: Convert bullet points to Markdown lists
 - `convert_headings(text: str) -> str`: Convert text to Markdown headings
+
+**Enhanced text cleaning includes:**
+- Standalone page numbers (e.g., `102` in footer)
+- Date patterns (e.g., `02/2021`)
+- App/system names in all-caps (e.g., `Product Portal`)
 
 ### RAG Module
 
@@ -420,6 +478,58 @@ results = query_vectorstore(
 
 ---
 
+#### `query_and_generate(query_text: str, collection_name: str = "product_docs", persist_dir: str = "./chroma_db", n_results: int = 5, embed_model: str = "nomic-embed-text", generation_model: str = "llama3.1:8b", use_web_search: bool = False) -> str`
+Retrieves relevant chunks and generates a concise answer using a local LLM.
+
+**Parameters:**
+- `query_text` (str): Natural language question
+- `collection_name` (str): ChromaDB collection name (default: `"product_docs"`)
+- `persist_dir` (str): Directory where ChromaDB data is stored (default: `"./chroma_db"`)
+- `n_results` (int): Number of chunks to retrieve for context (default: 5)
+- `embed_model` (str): Ollama model for query embedding (default: `"nomic-embed-text"`)
+- `generation_model` (str): Ollama model for answer generation (default: `"llama3.1:8b"`)
+- `use_web_search` (bool): If True, augment with web search ⚠️ (default: False)
+
+**Returns:**
+- `str`: Concise answer synthesized from retrieved chunks
+
+**Features:**
+- Retrieves relevant chunks from local ChromaDB
+- Optionally augments with DuckDuckGo web search
+- Synthesizes coherent answer using local LLM
+- Clear source labeling (local docs vs web)
+
+**Example:**
+```python
+answer = query_and_generate(
+    query_text="How does JWT authentication work?",
+    n_results=5,
+    generation_model="llama3.1:8b",
+    use_web_search=False  # Set to True for web augmentation
+)
+print(answer)
+```
+
+**⚠️ Privacy Warning for Web Search:**
+When `use_web_search=True`, your query is sent to DuckDuckGo servers. Only use for generic, non-sensitive questions.
+
+---
+
+#### `search_web(query: str, max_results: int = 3) -> List[Dict]`
+Searches the web using DuckDuckGo (optional, privacy-aware).
+
+**Parameters:**
+- `query` (str): Search query
+- `max_results` (int): Maximum number of results (default: 3)
+
+**Returns:**
+- `List[Dict]`: Each dict contains `{"text": str, "source": str}`
+
+**⚠️ Privacy Warning:**
+This function sends your query to DuckDuckGo servers. Do NOT use for sensitive/internal questions.
+
+---
+
 ## Configuration
 
 ### Chunking Parameters
@@ -512,10 +622,10 @@ See `requirements.txt` for exact versions.
 
 Product Portal      
 ```
-2. **Improve responses**: Queries return relevant chunks - change it to return more concise answers based on the chunks (e.g. using a local LLM for generation)
-3. **Error Handling**: Could be enhanced for edge cases (malformed PDFs, network issues)
-4. **Type Hints**: Could be enhanced with more specific return types
-5. **Batch Processing**: Add support for processing multiple PDFs in one command
+   - **note! implemented BUT NOT TESTED!**
+2. **Error Handling**: Could be enhanced for edge cases (malformed PDFs, network issues)
+3. **Type Hints**: Could be enhanced with more specific return types
+4. **Batch Processing**: Add support for processing multiple PDFs in one command
 
 ## Contributing
 
