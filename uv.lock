@@ -663,6 +663,8 @@ dependencies = [
     { name = "chromadb" },
     { name = "ollama" },
     { name = "pdfminer-six" },
+    { name = "rich" },
+    { name = "typer" },
 ]
 
 [package.metadata]
@@ -670,6 +672,8 @@ requires-dist = [
     { name = "chromadb", specifier = ">=1.5.8" },
     { name = "ollama", specifier = ">=0.6.1" },
     { name = "pdfminer-six", specifier = ">=20260107" },
+    { name = "rich", specifier = ">=15.0.0" },
+    { name = "typer", specifier = ">=0.25.1" },
 ]
 
 [[package]]
