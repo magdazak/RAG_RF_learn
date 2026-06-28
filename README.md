@@ -607,7 +607,30 @@ See `requirements.txt` for exact versions.
 - [x] **CLI Interface**: Typer-based CLI with build, query, and interactive modes
 - [x] **Duplicate Detection**: Automatic detection of already-processed PDFs
 - [ ] **LangChain Integration**: Seamless RAG pipeline
+  - Currently this RAG pipeline uses direct Ollama API calls and custom logic. LangChain is a framework that provides:
+    - Pre-built RAG chains (retrieval + generation pipelines)
+    - Memory management for conversational context
+    - Agent capabilities for complex reasoning
+    - Standardized interfaces for LLMs, vector stores, embeddings 
+  - Replace custom `query_and_generate()` with LangChain's `RetrievalQA` or `ConversationalRetrievalChain`
+  - Use `OllamaEmbeddings` wrapper instead of direct API calls
+  - Use `Chroma` LangChain wrapper for vectorstore
+  - Add conversation memory for multi-turn dialogues
+  - Enable prompt templates for better control
+  - Benefits: Less custom code, advanced features (agents, multi-query retrieval), better conversation handling
+  - Complexity: Medium (refactoring existing code)
 - [ ] **Web API**: FastAPI endpoint for document processing
+  - Expose your RAG pipeline as HTTP endpoints instead of CLI-only 
+  - Create FastAPI app with endpoints:
+    - `POST /documents` - Upload & process PDFs
+    - `POST /query` - Ask questions, get JSON responses
+    - `GET /collections` - List available collections
+    - `WebSocket /chat` - Real-time interactive chat
+  - Add CORS support for frontend access
+  - Request/response validation with Pydantic models
+  - Async processing for uploads
+  - Benefits: Enable web UI integration, API access for other applications, multi-user support, remote access
+  - Complexity: Medium-Low (additive, not breaking changes)
 - [ ] **Docker Support**: Containerized deployment
 - [ ] **Testing Suite**: Unit and integration tests
 - [ ] **Documentation**: Extended guides and examples
