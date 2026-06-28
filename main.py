@@ -1,6 +1,21 @@
 """
 RAG Pipeline CLI - Build and query vector stores from PDF documents.
 
+PRECONDITIONS:
+  1. Ollama must be running
+     - Install: https://ollama.ai/
+     - Start Ollama service (e.g., `ollama serve`)
+
+  2. Required Ollama models:
+     - Embedding model: nomic-embed-text
+       $ ollama pull nomic-embed-text
+     - Generation model: llama3.1:8b (or custom via --model)
+       $ ollama pull llama3.1:8b
+
+  3. Python dependencies:
+     $ pip install -r requirements.txt
+     (or use uv: uv sync)
+
 COMMANDS:
   build      - Process PDF and build vector store
   query      - Query the vector store with a question
