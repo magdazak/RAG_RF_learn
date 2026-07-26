@@ -14,7 +14,7 @@ This guide walks you through implementing a FastAPI-based web API for the LLM Lo
 
 ## Implementation Todos
 
-### ✅ Todo 1: Setup Dependencies and Project Structure
+### ✅ 1: Setup Dependencies and Project Structure
 **Goal:** Add required packages and create the API module structure
 
 **Steps:**
@@ -238,9 +238,11 @@ curl -X POST http://localhost:8000/api/v1/query \
    - Return success message
 
 **Implementation details:**
+
 ```python
 import chromadb
-client = chromadb.PersistentClient(path="./chroma_db")
+
+client = chromadb.PersistentClient(path="../chroma_db")
 collections = client.list_collections()
 ```
 

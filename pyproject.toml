@@ -7,8 +7,10 @@ requires-python = ">=3.12"
 dependencies = [
     "chromadb>=1.5.8",
     "ddgs>=9.14.4",
+    "fastapi>=0.115.0",
     "ollama>=0.6.1",
     "pdfminer-six>=20260107",
+    "python-multipart>=0.0.12",
     "rich>=15.0.0",
     "typer>=0.25.1",
 ]

@@ -637,15 +637,7 @@ See `requirements.txt` for exact versions.
 
 ## Known Issues & TODOs
 
-1. **Improve text cleaning**: ex. for 'NET_APP user guides' - remove page numbers, fix hyphenation, normalize whitespace:
-```commandline
-102                                                                                                                                                                                                                                 
-
-02/2021                                                                                                                                                                                                                             
-
-Product Portal      
-```
-   - **note! implemented BUT NOT TESTED!**
+1. **Improve text cleaning**: ✅
 2. **Error Handling**: Could be enhanced for edge cases (malformed PDFs, network issues)
 3. **Type Hints**: Could be enhanced with more specific return types
 4. **Batch Processing**: Add support for processing multiple PDFs in one command
