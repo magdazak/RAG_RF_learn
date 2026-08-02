@@ -71,6 +71,60 @@ POST /query
 }
 ```
 
+<details>
+<summary><strong>Side note: OpenAPI / Swagger UI / FastAPI docs</strong></summary>
+
+OpenAPI is the blueprint, Swagger UI is the display, and FastAPI is the construction worker. They are not competitors; 
+rather, they form a unified ecosystem for building, describing, and interacting with RESTful web services.
+
+#### The Core Ecosystem At A Glance
+
+- OpenAPI is an open specification (a standard format). It dictates how a REST API should be described using a standard JSON or YAML file. It is governed by the Linux Foundation.
+- Swagger UI is a frontend tool created by SmartBear. It reads an OpenAPI JSON/YAML file and converts it into an interactive web page where users can test endpoints right from their browser.
+- FastAPI is a Python web framework. It builds the actual API backend using Python type hints, and automatically writes the OpenAPI blueprint for you behind the scenes.
+
+🔄 How They Work Together
+
+- **Code First**: You write your backend endpoints in Python using FastAPI.
+- **Auto-Generation**: FastAPI inspects your Python types and generates an OpenAPI compliant JSON schema file at `/openapi.json`.
+- **Visualisation**: FastAPI hosts a Swagger UI client at `/docs`. The UI reads that auto-generated OpenAPI file and gives you a beautiful web page to play with.
+
+⚖️ Structural Differences
+
+| Feature | OpenAPI | Swagger UI | FastAPI |
+|---------|---------|------------|---------|
+| What is it? | A technical specification standard | A graphical web interface tool | A Python backend framework |
+| Language | JSON or YAML | JavaScript, HTML, & CSS | Python (3.8+) |
+| Primary Job | Standardises API definitions | Renders and tests endpoints | Processes requests and data |
+| Execution | Cannot execute code | Sends real browser API requests | Runs backend business logic |
+
+#### Major Similarities
+- **Interoperability**: They are completely tethered by the exact same open standard. Any tool that understands OpenAPI (like Postman or ReDoc) can read what FastAPI makes or what Swagger UI renders.
+- **The History Link**: "Swagger" used to be the name of the specification before version 3.0. The spec was donated to the Linux Foundation in 2015 and renamed OpenAPI. Today, "Swagger" refers exclusively to SmartBear's toolset (like Swagger UI).
+
+#### Code Example: The Trio in Action
+When you write this simple FastAPI code (python):
+```
+from fastapi import FastAPI
+from pydantic import BaseModel
+
+app = FastAPI()
+
+class Item(BaseModel):
+    name: str
+    price: float
+
+@app.post("/items/")
+def create_item(item: Item):
+    return {"message": f"Created {item.name}!"}
+```
+  
+- FastAPI runs the server and ensures that incoming price variables must be floating-point numbers.
+- OpenAPI receives a hidden description: "/items/": { "post": { "requestBody": { ... "properties": { "price": {"type": "number"} } } } }.
+- Swagger UI builds an interactive block at http://127.0.0 with a "Try it out" button so you can input values and test your backend route without writing any frontend code.
+
+</details>
+
 ---
 
 ### 2. What is `python-multipart`?

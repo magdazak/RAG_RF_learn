@@ -528,6 +528,399 @@ in production.
 
 It's intended purely for development because it continuously watches files and restarts processes.
 
+<details>
+<summary><strong>A bit more about uvicorn</strong></summary>
+
+## Understanding Uvicorn for FastAPI
+
+Uvicorn is actually a great topic to understand because when people start with FastAPI, they often focus on FastAPI itself and forget that something has to actually listen on the network and handle HTTP connections.
+
+A useful mental model is:
+
+```text
+Your RAG code
+     |
+     v
+FastAPI
+     |
+     v
+Uvicorn
+     |
+     v
+Network / Browser / Postman
+```
+
+FastAPI defines what should happen when a request arrives.
+
+Uvicorn is what actually receives the request from the network.
+
+---
+
+## What is Uvicorn?
+
+Uvicorn is an **ASGI web server** for Python.
+
+Think:
+
+```text
+FastAPI = Application
+Uvicorn = Server
+```
+
+Similar to:
+
+```text
+Chrome = Browser
+Windows/Linux = Operating System
+```
+
+Chrome needs an OS to run on.
+
+FastAPI needs a server to run on.
+
+---
+
+## What does Uvicorn actually do?
+
+When you start:
+
+```bash
+uvicorn src.api.app:app
+```
+
+Uvicorn:
+
+1. Opens port 8000
+2. Listens for incoming HTTP requests
+3. Receives requests from clients
+4. Passes them to FastAPI
+5. Gets the response from FastAPI
+6. Sends the response back
+
+Example:
+
+```text
+Browser
+   |
+GET /health
+   |
+   v
+Uvicorn
+   |
+   v
+FastAPI
+   |
+   v
+health()
+   |
+   v
+{"status":"healthy"}
+   |
+   v
+Uvicorn
+   |
+   v
+Browser
+```
+
+---
+
+## What does this command mean?
+
+```bash
+uvicorn src.api.app:app --reload
+```
+
+#### `src.api.app`
+
+This is Python module notation.
+
+Equivalent to:
+
+```text
+src/api/app.py
+```
+
+#### `:app`
+
+Means:
+
+```python
+app = FastAPI()
+```
+
+inside that file.
+
+Example:
+
+```python
+# src/api/app.py
+
+from fastapi import FastAPI
+
+app = FastAPI()
+```
+
+Uvicorn loads that object.
+
+---
+
+## Why FastAPI Likes Uvicorn
+
+FastAPI is built around modern Python async programming.
+
+Uvicorn is designed for:
+
+```python
+async def query():
+    ...
+```
+
+and handles many concurrent requests efficiently.
+
+This makes it very popular for:
+
+- APIs
+- AI services
+- Chatbots
+- RAG systems
+- ML inference endpoints
+
+---
+
+## WSGI vs ASGI
+
+#### Older generation
+
+```text
+Flask
+Django (traditional)
+      |
+      v
+     WSGI
+```
+
+#### Modern generation
+
+```text
+FastAPI
+Starlette
+Quart
+      |
+      v
+     ASGI
+```
+
+### What ASGI gives you
+
+Support for:
+
+- `async def`
+- WebSockets
+- Streaming
+- High concurrency
+- Long-running AI requests
+
+For a RAG application, ASGI is particularly useful because LLM calls can take several seconds.
+
+---
+
+## What is Async?
+
+Imagine 100 users ask questions at the same time.
+
+Without async:
+
+```text
+Request 1 -> wait
+Request 2 -> wait
+Request 3 -> wait
+```
+
+Everything becomes sequential.
+
+With async:
+
+```text
+Request 1 -> Ollama thinking
+Request 2 -> Ollama thinking
+Request 3 -> Ollama thinking
+```
+
+The server can manage many waiting requests simultaneously.
+
+For AI applications this is a huge benefit.
+
+---
+
+## The Magic of `--reload`
+
+One of the best development features.
+
+Without it:
+
+```text
+Edit code
+Stop server
+Start server
+```
+
+again and again.
+
+With:
+
+```bash
+uvicorn src.api.app:app --reload
+```
+
+Workflow becomes:
+
+```text
+Edit file
+Save
+Uvicorn notices change
+Server restarts automatically
+```
+
+Very convenient when developing APIs.
+
+---
+
+## Why Not Use `--reload` In Production?
+
+Because Uvicorn constantly watches files.
+
+Watching files means:
+
+- additional CPU usage
+- additional memory usage
+- extra process management
+
+Production servers do not need that.
+
+Typical production command:
+
+```bash
+uvicorn src.api.app:app
+```
+
+or
+
+```bash
+gunicorn -k uvicorn.workers.UvicornWorker
+```
+
+for larger deployments.
+
+---
+
+## Host and Port
+
+You will often see:
+
+```bash
+uvicorn src.api.app:app     --host 0.0.0.0     --port 8000
+```
+
+#### Port
+
+```text
+localhost:8000
+```
+
+The port identifies the service.
+
+Examples:
+
+```text
+8000 -> FastAPI
+3000 -> React
+5432 -> PostgreSQL
+```
+
+#### Host
+
+##### Local only
+
+```bash
+--host 127.0.0.1
+```
+
+Only your own machine can access it.
+
+##### Accessible from network
+
+```bash
+--host 0.0.0.0
+```
+
+Listen on all network interfaces.
+
+Useful for:
+
+- Docker
+- Kubernetes
+- VMs
+- Other machines in the network
+
+---
+
+## Uvicorn Logs
+
+When started:
+
+```text
+INFO: Started server process
+INFO: Waiting for application startup
+INFO: Application startup complete
+INFO: Uvicorn running on http://127.0.0.1:8000
+```
+
+When requests arrive:
+
+```text
+127.0.0.1:52521 - "GET /health HTTP/1.1" 200
+```
+
+From a tester's perspective, these logs are extremely useful.
+
+You immediately see:
+
+- endpoint called
+- HTTP method
+- response code
+- basic traffic information
+
+---
+
+## For Your RAG Project
+
+At the beginning:
+
+```bash
+python main.py ask "What is RAG?"
+```
+
+Later:
+
+```bash
+uvicorn src.api.app:app --reload
+```
+
+And users will interact through:
+
+```http
+POST /api/v1/query
+```
+
+instead of a CLI command.
+
+So the simplest way to think about Uvicorn is:
+
+> FastAPI is your API application. Uvicorn is the web server that exposes that application to the outside world. Without Uvicorn, your FastAPI code exists, but nobody can send HTTP requests to it.
+
+</details>
+
 ---
 
 ## Mental Model for Todo 2
