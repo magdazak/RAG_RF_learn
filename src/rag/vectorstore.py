@@ -8,7 +8,7 @@ Exposes three main functions:
 
 This code is using ChromaDB in persistent client mode, meaning:
 1. No separate server needed - ChromaDB runs embedded in your Python application
-2. Automatic start - It starts when you run main.py
+2. Automatic start - It starts when you run rag_cli.py
 3. Local storage - Data persists to the ./chroma_db directory
 """
 

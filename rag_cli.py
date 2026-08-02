@@ -22,13 +22,13 @@ COMMANDS:
   interactive - Interactive Q&A mode
 
 EXAMPLES:
-  python main.py build path/to/document.pdf
-  python main.py query "How do I configure the system?"
-  python main.py interactive
+  python rag_cli.py build path/to/document.pdf
+  python rag_cli.py query "How do I configure the system?"
+  python rag_cli.py interactive
   
   # Use web search to augment answers (⚠️ sends query to DuckDuckGo)
-  python main.py query "How does OAuth work?" --web-search
-  python main.py interactive --web-search
+  python rag_cli.py query "How does OAuth work?" --web-search
+  python rag_cli.py interactive --web-search
 
 WEB SEARCH:
   The --web-search flag augments answers with information from the internet.
@@ -85,7 +85,7 @@ def build(
         console.print(f"\n[yellow]⚠ Warning:[/yellow] This PDF appears to have been processed already.")
         console.print(f"[dim]Existing file: {embedded_jsonl_path}[/dim]")
         console.print(f"\n[bold]Use --force to rebuild:[/bold]")
-        console.print(f"  python main.py build \"{pdf_path}\" --force\n")
+        console.print(f"  python rag_cli.py build \"{pdf_path}\" --force\n")
         raise typer.Exit(0)
     
     if force and os.path.exists(embedded_jsonl_path):
@@ -171,8 +171,8 @@ def query(
     
     \b
     Examples:
-      python main.py query "How does JWT authentication work?"
-      python main.py query "What is OAuth 2.0?" --web-search
+      python rag_cli.py query "How does JWT authentication work?"
+      python rag_cli.py query "What is OAuth 2.0?" --web-search
     """
     from src.rag.vectorstore import query_and_generate
     
@@ -224,8 +224,8 @@ def interactive(
     
     \b
     Examples:
-      python main.py interactive
-      python main.py interactive --web-search
+      python rag_cli.py interactive
+      python rag_cli.py interactive --web-search
     """
     from src.rag.vectorstore import query_and_generate
     

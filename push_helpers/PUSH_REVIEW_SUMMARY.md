@@ -33,7 +33,7 @@
 - ✅ `.python-version` - Python 3.12 specification
 
 #### 📝 Main Entry Point
-- ✅ `main.py` - **Clearly marked DRAFT**
+- ✅ `rag_cli.py` - **Clearly marked DRAFT**
 
 ### NOT Pushed (Ignored) ✅
 - ❌ `data_processed/` - Generated markdown files
@@ -58,7 +58,7 @@
 
 **Recommendations**:
 ```python
-# SUGGESTION 1: Add error handling in main.py
+# SUGGESTION 1: Add error handling in rag_cli.py
 def run_pipeline(file_name: str, pdf_path: str, output_path: str) -> bool:
     """Run pipeline with error handling."""
     try:
@@ -132,8 +132,8 @@ class TestConvertLists:
 **Commands to add to GitHub Actions**:
 ```bash
 pytest --cov=src tests/
-black --check src/ main.py
-isort --check-only src/ main.py
+black --check src/ rag_cli.py
+isort --check-only src/ rag_cli.py
 ```
 
 ### 4. **Dependencies** (GOOD) ✅
@@ -228,7 +228,7 @@ git commit -m "Initial commit: Add LLM Local RAG pipeline
 - Comprehensive documentation (README, architecture, contributing)
 - Clean package structure with proper module exports
 - Type hints and docstrings throughout
-- Draft main.py with clear TODOs
+- Draft rag_cli.py with clear TODOs
 
 See README.md for overview, PROJECT_STRUCTURE.md for architecture."
 ```

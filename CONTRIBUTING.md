@@ -6,7 +6,7 @@ Thank you for your interest in contributing to LLM Local! This document provides
 
 - **`src/data_extract/`**: PDF processing and text cleaning
 - **`src/rag/`**: Document chunking and vector store (RAG pipeline)
-- **`main.py`**: Pipeline orchestration (currently draft)
+- **`rag_cli.py`**: Pipeline orchestration 
 - **Tests**: To be added in `tests/` directory
 
 ## Development Setup
@@ -53,11 +53,11 @@ Thank you for your interest in contributing to LLM Local! This document provides
 - Follow **PEP 8**
 - Use `black` for formatting:
   ```bash
-  black src/ main.py
+  black src/ rag_cli.py
   ```
 - Use `isort` for import organization:
   ```bash
-  isort src/ main.py
+  isort src/ rag_cli.py
   ```
 
 ### Type Hints

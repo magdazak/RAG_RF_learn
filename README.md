@@ -74,7 +74,7 @@ LLM_Local/
 │       ├── embeddings.py          # Embedding generation via local Ollama
 │       ├── vectorstore.py         # ChromaDB + answer generation
 │       └── web_search.py          # Optional web search (DuckDuckGo)
-├── main.py                         # CLI application
+├── rag_cli.py                         # CLI application
 ├── pyproject.toml                  # Project metadata & dependencies
 ├── requirements.txt                # Dependency pinning
 ├── .gitignore                      # Git ignore rules
@@ -129,12 +129,12 @@ The project provides a modern CLI powered by **Typer** for easy interaction with
 Process a PDF and build the vector store in one command:
 
 ```bash
-python main.py build path/to/document.pdf
+python rag_cli.py build path/to/document.pdf
 ```
 
 **Options:**
 ```bash
-python main.py build document.pdf --help
+python rag_cli.py build document.pdf --help
 
 # Common options:
 --collection-name TEXT    # ChromaDB collection name (default: "product_docs")
@@ -147,17 +147,17 @@ python main.py build document.pdf --help
 **Duplicate Detection**: The CLI automatically detects if a PDF was already processed and prevents re-processing:
 
 ```bash
-$ python main.py build document.pdf
+$ python rag_cli.py build document.pdf
 ⚠ Warning: This PDF appears to have been processed already.
 Existing file: ./json_chunks/document_embedded.jsonl
 
 Use --force to rebuild:
-  python main.py build "document.pdf" --force
+  python rag_cli.py build "document.pdf" --force
 ```
 
 To force a rebuild:
 ```bash
-python main.py build document.pdf --force
+python rag_cli.py build document.pdf --force
 ```
 
 #### 2. Query the Vector Store
@@ -165,7 +165,7 @@ python main.py build document.pdf --force
 Ask questions and get AI-generated answers from your documents:
 
 ```bash
-python main.py query "How do I reset a password?"
+python rag_cli.py query "How do I reset a password?"
 ```
 
 This retrieves relevant chunks from your local documents and synthesizes a concise answer using **llama3.1:8b**.
@@ -181,14 +181,14 @@ This retrieves relevant chunks from your local documents and synthesizes a conci
 
 **Example with options:**
 ```bash
-python main.py query "What is OAuth 2.0?" --n-results 3 --model mistral
+python rag_cli.py query "What is OAuth 2.0?" --n-results 3 --model mistral
 ```
 
 **Web Search (Privacy Warning):**
 ```bash
 # ⚠️ WARNING: Sends your query to DuckDuckGo servers
 # Only use for generic, non-sensitive questions
-python main.py query "What are JWT best practices?" --web-search
+python rag_cli.py query "What are JWT best practices?" --web-search
 ```
 
 When `--web-search` is enabled:
@@ -203,7 +203,7 @@ When `--web-search` is enabled:
 Start an interactive session to ask multiple questions:
 
 ```bash
-python main.py interactive
+python rag_cli.py interactive
 ```
 
 ```
@@ -243,7 +243,7 @@ Goodbye!
 **Interactive with web search:**
 ```bash
 # ⚠️ WARNING: ALL queries in this session will be sent to DuckDuckGo
-python main.py interactive --web-search
+python rag_cli.py interactive --web-search
 ```
 
 ### Programmatic Usage (Python API)
@@ -299,50 +299,50 @@ print(answer)
 
 **1. Process a new PDF document:**
 ```bash
-python main.py build "C:/Documents/UserManual.pdf"
+python rag_cli.py build "C:/Documents/UserManual.pdf"
 ```
 
 **2. Process with custom chunking parameters:**
 ```bash
-python main.py build document.pdf --max-chunk-size 1500 --overlap 150
+python rag_cli.py build document.pdf --max-chunk-size 1500 --overlap 150
 ```
 
 **3. Query your documents:**
 ```bash
-python main.py query "How do I install the software?"
+python rag_cli.py query "How do I install the software?"
 ```
 
 **4. Query with web search augmentation:**
 ```bash
 # ⚠️ Only for generic questions - sends query to DuckDuckGo
-python main.py query "What are OAuth 2.0 best practices?" --web-search
+python rag_cli.py query "What are OAuth 2.0 best practices?" --web-search
 ```
 
 **5. Use multiple collections for different document sets:**
 ```bash
 # Build a collection for technical docs
-python main.py build tech_manual.pdf --collection-name tech_docs
+python rag_cli.py build tech_manual.pdf --collection-name tech_docs
 
 # Build a collection for user guides
-python main.py build user_guide.pdf --collection-name user_docs
+python rag_cli.py build user_guide.pdf --collection-name user_docs
 
 # Query specific collection
-python main.py query "API endpoints" --collection-name tech_docs
+python rag_cli.py query "API endpoints" --collection-name tech_docs
 ```
 
 **6. Force rebuild after document update:**
 ```bash
-python main.py build updated_manual.pdf --force
+python rag_cli.py build updated_manual.pdf --force
 ```
 
 **7. Interactive exploration:**
 ```bash
-python main.py interactive --n-results 5
+python rag_cli.py interactive --n-results 5
 ```
 
 **8. Interactive with different LLM model:**
 ```bash
-python main.py interactive --model mistral
+python rag_cli.py interactive --model mistral
 ```
 
 ## API Reference
@@ -534,7 +534,7 @@ This function sends your query to DuckDuckGo servers. Do NOT use for sensitive/i
 
 ### Chunking Parameters
 
-Adjust these in `main.py` or when calling `markdown_chunker()`:
+Adjust these in `rag_cli.py` or when calling `markdown_chunker()`:
 
 - **max_chunk_size**: Size threshold (characters) for splitting chunks
   - Smaller values: More granular, more chunks
