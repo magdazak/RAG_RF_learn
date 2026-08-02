@@ -45,7 +45,7 @@ This guide walks you through implementing a FastAPI-based web API for the LLM Lo
 
 ---
 
-### ✅ Todo 2: Create Core FastAPI Application
+### ✅ 2: Create Core FastAPI Application
 **Goal:** Set up the main FastAPI app with basic configuration
 
 **File:** `src/api/app.py`
@@ -78,7 +78,7 @@ python api_server.py
 
 ---
 
-### ✅ Todo 3: Define Pydantic Models
+### Todo 3: Define Pydantic Models
 **Goal:** Create request/response models for type safety and validation
 
 **File:** `src/api/models.py`
@@ -123,7 +123,7 @@ python api_server.py
 
 ---
 
-### ✅ Todo 4: Implement Document Processing Endpoints
+### Todo 4: Implement Document Processing Endpoints
 **Goal:** Enable PDF upload and background processing
 
 **File:** `src/api/routes/documents.py`
@@ -172,7 +172,7 @@ curl http://localhost:8000/api/v1/documents/{job_id}
 
 ---
 
-### ✅ Todo 5: Implement Query Endpoints
+### Todo 5: Implement Query Endpoints
 **Goal:** Expose the RAG query functionality via HTTP
 
 **File:** `src/api/routes/query.py`
@@ -217,7 +217,7 @@ curl -X POST http://localhost:8000/api/v1/query \
 
 ---
 
-### ✅ Todo 6: Implement Collection Management Endpoints
+### Todo 6: Implement Collection Management Endpoints
 **Goal:** List and manage ChromaDB collections
 
 **File:** `src/api/routes/collections.py`
@@ -265,7 +265,7 @@ curl -X DELETE http://localhost:8000/api/v1/collections/test_collection
 
 ---
 
-### ✅ Todo 7: Testing and Documentation
+### Todo 7: Testing and Documentation
 **Goal:** Verify everything works and document usage
 
 **Testing tasks:**
