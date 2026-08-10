@@ -690,6 +690,19 @@ This makes it very popular for:
 
 ## WSGI vs ASGI
 
+**WSGI** and **ASGI** are Python interface standards that connect a web server to an application. WSGI (Web Server Gateway Interface) is older, synchronous, and handles one request at a time. ASGI (Asynchronous Server Gateway Interface) is a newer, asynchronous standard that handles multiple concurrent requests and WebSocket connections.
+
+**_Key Differences_**:
+- **Operation Model:** WSGI is synchronous and blocking; ASGI is asynchronous and supports async/await.
+- **Supported Protocols:** WSGI only supports HTTP; ASGI supports HTTP/1.1, HTTP/2, WebSockets, and SSE.
+- **Concurrency:** WSGI requires multiple threads or processes for parallel tasks, while ASGI handles multiple connections within a single event loop.
+- **Server Examples:** 
+   - WSGI: Gunicorn, uWSGI, mod_wsgi. 
+   - ASGI: Uvicorn, Daphne, Granian.
+- **Framework Examples:** 
+   - WSGI: Flask, Django (traditionally), Bottle. 
+   - ASGI: FastAPI, Starlette, Django (version 3.0+).
+
 #### Older generation
 
 ```text
