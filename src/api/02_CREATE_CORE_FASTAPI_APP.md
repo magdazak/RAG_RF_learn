@@ -1,4 +1,4 @@
-## FastAPI Todo 2 Learning Notes
+## FastAPI Learning Notes: Part 2 - Creating the Core FastAPI App
 
 ### Big Picture
 

@@ -78,7 +78,7 @@ python api_server.py
 
 ---
 
-### Todo 3: Define Pydantic Models
+### ✅ 3: Define Pydantic Models
 **Goal:** Create request/response models for type safety and validation
 
 **File:** `src/api/models.py`
@@ -123,7 +123,7 @@ python api_server.py
 
 ---
 
-### Todo 4: Implement Document Processing Endpoints
+### ✅ 4: Implement Document Processing Endpoints
 **Goal:** Enable PDF upload and background processing
 
 **File:** `src/api/routes/documents.py`

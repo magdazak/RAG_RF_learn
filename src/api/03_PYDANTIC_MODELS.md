@@ -1,4 +1,4 @@
-## FastAPI Todo 3 Learning Notes: Pydantic Models
+## FastAPI Learning Notes: Part 3 - Pydantic Models
 
 ### Big Picture
 

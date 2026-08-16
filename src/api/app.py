@@ -5,12 +5,15 @@ Provides HTTP endpoints for document processing and querying.
 """
 
 import time
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from typing import Dict, Any
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+
+from src.api.dependencies import cleanup_expired_jobs
 
 # Configure logging
 logging.basicConfig(
@@ -19,12 +22,26 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+CLEANUP_INTERVAL_SECONDS = 60 * 60  # run TTL cleanup hourly
+
+
+async def _ttl_cleanup_loop() -> None:
+    """Periodically remove job records older than the configured TTL (default 24h)."""
+    while True:
+        await asyncio.sleep(CLEANUP_INTERVAL_SECONDS)
+        try:
+            cleanup_expired_jobs()
+        except Exception:
+            logger.exception("Job TTL cleanup failed")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan events."""
     logger.info("Starting LLM Local API server...")
+    cleanup_task = asyncio.create_task(_ttl_cleanup_loop())
     yield
+    cleanup_task.cancel()
     logger.info("Shutting down LLM Local API server...")
 
 
@@ -108,9 +125,11 @@ async def root() -> Dict[str, str]:
     }
 
 
-# Import and include routers (will be implemented in future todos)
-# from src.api.routes import documents, query, collections
-# app.include_router(documents.router, prefix="/api/v1", tags=["Documents"])
+# Import and include routers
+from src.api.routes import documents  # noqa: E402
+# from src.api.routes import query, collections
+
+app.include_router(documents.router, prefix="/api/v1", tags=["Documents"])
 # app.include_router(query.router, prefix="/api/v1", tags=["Query"])
 # app.include_router(collections.router, prefix="/api/v1", tags=["Collections"])
 
