@@ -7,6 +7,8 @@ import time
 from pathlib import Path
 from typing import Dict
 
+import chromadb
+
 from src.api.models import ProcessingStatus
 
 logger = logging.getLogger(__name__)
@@ -16,6 +18,19 @@ CHROMA_PERSIST_DIR = "./chroma_db"
 
 # Collection that cannot be deleted via the API (safety guard).
 DEFAULT_COLLECTION_NAME = "product_docs"
+
+# Cached ChromaDB client (singleton) – avoids re-opening the DB on every request.
+_chroma_client: chromadb.ClientAPI | None = None
+
+
+def get_chroma_client(persist_dir: str = CHROMA_PERSIST_DIR) -> chromadb.ClientAPI:
+    """Return a shared ChromaDB PersistentClient, creating it on first call."""
+    global _chroma_client
+    if _chroma_client is None:
+        _chroma_client = chromadb.PersistentClient(path=persist_dir)
+        logger.info("ChromaDB client initialised (persist_dir=%s).", persist_dir)
+    client = _chroma_client
+    return client
 
 # Directory where uploaded PDFs are temporarily stored before processing.
 UPLOAD_DIR = Path("uploads")

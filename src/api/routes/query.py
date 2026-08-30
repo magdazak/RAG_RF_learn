@@ -5,7 +5,6 @@ Query endpoint - exposes the RAG retrieval + generation pipeline via HTTP.
 import logging
 import time
 
-import chromadb
 from fastapi import APIRouter, HTTPException
 
 from src.api.dependencies import CHROMA_PERSIST_DIR
@@ -16,26 +15,12 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-
-def _collection_exists(collection_name: str, persist_dir: str = CHROMA_PERSIST_DIR) -> bool:
-    """Check whether a ChromaDB collection with the given name exists."""
-    client = chromadb.PersistentClient(path=persist_dir)
-    existing_names = {c.name for c in client.list_collections()}
-    return collection_name in existing_names
-
-
 @router.post("/query", response_model=QueryResponse, tags=["Query"])
 async def query(request: QueryRequest) -> QueryResponse:
     """
     Ask a question against a ChromaDB collection and get a generated answer
     along with the source chunks used to build the context.
     """
-    if not _collection_exists(request.collection_name):
-        raise HTTPException(
-            status_code=404,
-            detail=f"Collection '{request.collection_name}' not found.",
-        )
-
     # Import lazily so the module can be imported without pulling in heavy deps
     # (ollama, embeddings) unless a query is actually made.
     from src.rag.vectorstore import query_and_generate
@@ -52,13 +37,17 @@ async def query(request: QueryRequest) -> QueryResponse:
             return_sources=True,
         )
     except ConnectionError as exc:
-        # ollama-python raises ConnectionError when it can't reach the Ollama
-        # server. This can happen either while embedding the query for
-        # retrieval, or while generating the final answer.
         logger.exception("Could not reach Ollama")
         raise HTTPException(
             status_code=503,
             detail="Ollama service is unavailable. Ensure `ollama serve` is running.",
+        ) from exc
+    except ValueError as exc:
+        # ChromaDB raises ValueError for non-existent collections in some versions
+        logger.warning("Collection lookup failed: %s", exc)
+        raise HTTPException(
+            status_code=404,
+            detail=f"Collection '{request.collection_name}' not found.",
         ) from exc
     except Exception as exc:
         logger.exception("Query processing failed")

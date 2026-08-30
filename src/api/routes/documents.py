@@ -15,7 +15,7 @@ from src.api.dependencies import (
     MAX_FILE_SIZE_BYTES,
     UPLOAD_DIR,
     get_jobs,
-    jobs,
+    jobs,  # used directly by the background task (_process_document)
     register_job,
 )
 from src.api.models import DocumentUploadResponse, ProcessingStatus
