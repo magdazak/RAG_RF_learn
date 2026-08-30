@@ -217,7 +217,7 @@ curl -X POST http://localhost:8000/api/v1/query \
 
 ---
 
-### Todo 6: Implement Collection Management Endpoints
+### ✅ 6: Implement Collection Management Endpoints
 **Goal:** List and manage ChromaDB collections
 
 **File:** `src/api/routes/collections.py`
