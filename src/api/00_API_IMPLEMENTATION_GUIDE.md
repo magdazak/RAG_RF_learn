@@ -172,7 +172,7 @@ curl http://localhost:8000/api/v1/documents/{job_id}
 
 ---
 
-### Todo 5: Implement Query Endpoints
+### ✅ 5: Implement Query Endpoints
 **Goal:** Expose the RAG query functionality via HTTP
 
 **File:** `src/api/routes/query.py`

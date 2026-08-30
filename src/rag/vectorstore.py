@@ -15,7 +15,7 @@ This code is using ChromaDB in persistent client mode, meaning:
 import logging
 import chromadb
 import ollama
-from typing import List, Dict
+from typing import List, Dict, Tuple, Union
 from src.rag.embeddings import get_embedding, DEFAULT_EMBED_MODEL
 
 logger = logging.getLogger(__name__)
@@ -119,7 +119,8 @@ def query_and_generate(
     embed_model: str = DEFAULT_EMBED_MODEL,
     generation_model: str = DEFAULT_GENERATION_MODEL,
     use_web_search: bool = False,
-) -> str:
+    return_sources: bool = False,
+) -> Union[str, Tuple[str, List[Dict]]]:
     """
     Query the vector store and generate a concise answer using a local LLM.
 
@@ -137,9 +138,14 @@ def query_and_generate(
         generation_model (str):  Ollama model for answer generation.
         use_web_search   (bool): If True, augment with web search results.
                                  ⚠️ WARNING: Sends query to DuckDuckGo servers.
+        return_sources    (bool): If True, also return the retrieved chunks
+                                 alongside the answer (as a tuple), so callers
+                                 (e.g. the API) don't need to run retrieval a
+                                 second time just to show sources.
 
     Returns:
         str: A concise answer synthesized from the retrieved chunks.
+        Tuple[str, List[Dict]]: (answer, source_chunks) when return_sources=True.
     """
     # Retrieve relevant chunks from vector store
     chunks = query_vectorstore(
@@ -174,7 +180,8 @@ def query_and_generate(
                 context_parts.append(f"{result['text']}\nSource: {result['source']}")
 
     if not context_parts:
-        return "No relevant information found to answer this question."
+        answer = "No relevant information found to answer this question."
+        return (answer, chunks) if return_sources else answer
 
     context = "\n\n".join(context_parts)
 
@@ -193,7 +200,9 @@ Answer:"""
             prompt=prompt,
             stream=False,
         )
-        return response["response"].strip()
+        answer = response["response"].strip()
     except Exception as e:
         logger.error(f"Error generating answer with {generation_model}: {e}")
-        return "Error: Could not generate an answer. Please try again."
+        answer = "Error: Could not generate an answer. Please try again."
+
+    return (answer, chunks) if return_sources else answer

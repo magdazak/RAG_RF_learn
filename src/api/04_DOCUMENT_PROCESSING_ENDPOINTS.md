@@ -21,7 +21,7 @@ This note covers:
 
 ### Big Picture
 
-This TODO introduces a common backend pattern:
+This DOC introduces a common backend pattern:
 
 ```text
 Upload Request
@@ -660,7 +660,7 @@ This is an excellent Robot Framework E2E test candidate.
 
 ### Key Takeaway
 
-> Todo 4 introduces one of the most important backend patterns: create a job, return a tracking ID immediately, process work in the background, and expose a status endpoint.
+> 'Part 4 - Document Processing Endpoints' introduces one of the most important backend patterns: create a job, return a tracking ID immediately, process work in the background, and expose a status endpoint.
 
 This pattern is used throughout modern software systems, including:
 

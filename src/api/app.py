@@ -126,10 +126,10 @@ async def root() -> Dict[str, str]:
 
 
 # Import and include routers
-from src.api.routes import documents  # noqa: E402
-# from src.api.routes import query, collections
+from src.api.routes import documents, query  # noqa: E402
+# from src.api.routes import collections
 
 app.include_router(documents.router, prefix="/api/v1", tags=["Documents"])
-# app.include_router(query.router, prefix="/api/v1", tags=["Query"])
+app.include_router(query.router, prefix="/api/v1", tags=["Query"])
 # app.include_router(collections.router, prefix="/api/v1", tags=["Collections"])
 
