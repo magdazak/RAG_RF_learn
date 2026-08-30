@@ -11,6 +11,12 @@ from src.api.models import ProcessingStatus
 
 logger = logging.getLogger(__name__)
 
+# ChromaDB persistence directory, shared across query/documents/collections routes.
+CHROMA_PERSIST_DIR = "./chroma_db"
+
+# Collection that cannot be deleted via the API (safety guard).
+DEFAULT_COLLECTION_NAME = "product_docs"
+
 # Directory where uploaded PDFs are temporarily stored before processing.
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)

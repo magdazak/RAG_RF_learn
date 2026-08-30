@@ -11,6 +11,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPExcepti
 
 from src.api.dependencies import (
     ALLOWED_EXTENSIONS,
+    CHROMA_PERSIST_DIR,
     MAX_FILE_SIZE_BYTES,
     UPLOAD_DIR,
     get_jobs,
@@ -24,7 +25,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def _process_document(job_id: str, file_path: Path, collection_name: str, persist_dir: str = "./chroma_db") -> None:
+def _process_document(job_id: str, file_path: Path, collection_name: str, persist_dir: str = CHROMA_PERSIST_DIR) -> None:
     """
     Background task that runs the full PDF -> vector store pipeline for one document.
 

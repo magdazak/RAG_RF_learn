@@ -8,13 +8,13 @@ import time
 import chromadb
 from fastapi import APIRouter, HTTPException
 
+from src.api.dependencies import CHROMA_PERSIST_DIR
 from src.api.models import QueryRequest, QueryResponse
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-CHROMA_PERSIST_DIR = "./chroma_db"
 
 
 def _collection_exists(collection_name: str, persist_dir: str = CHROMA_PERSIST_DIR) -> bool:
