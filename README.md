@@ -54,6 +54,12 @@ This project provides a complete pipeline for:
   - Three commands: `build`, `query`, `interactive`
   - Duplicate detection with `--force` override
   - Rich console output with colors and formatting
+- 🌍 **Web API (FastAPI)**:
+  - RESTful endpoints for document upload, querying, and collection management
+  - Background PDF processing with job tracking
+  - Auto-generated interactive docs (Swagger UI at `/docs`)
+  - CORS support for frontend integration
+  - Pydantic request/response validation
 - 💾 **JSONL Output**: Save chunks with heading context for RAG pipelines
 
 ## Project Structure
@@ -67,14 +73,23 @@ LLM_Local/
 │   │   ├── pdf_loader.py         # PDF text extraction
 │   │   ├── markdown_converter.py  # Text to Markdown conversion
 │   │   └── text_cleaning.py      # Text normalization & formatting
-│   └── rag/                        # RAG pipeline components
-│       ├── __init__.py
-│       ├── chunking.py            # Markdown-aware chunking logic
-│       ├── chunking_utils.py      # JSONL save utilities
-│       ├── embeddings.py          # Embedding generation via local Ollama
-│       ├── vectorstore.py         # ChromaDB + answer generation
-│       └── web_search.py          # Optional web search (DuckDuckGo)
-├── rag_cli.py                         # CLI application
+│   ├── rag/                        # RAG pipeline components
+│   │   ├── __init__.py
+│   │   ├── chunking.py            # Markdown-aware chunking logic
+│   │   ├── chunking_utils.py      # JSONL save utilities
+│   │   ├── embeddings.py          # Embedding generation via local Ollama
+│   │   ├── vectorstore.py         # ChromaDB + answer generation
+│   │   └── web_search.py          # Optional web search (DuckDuckGo)
+│   └── api/                        # FastAPI web API
+│       ├── app.py                 # Main FastAPI application & middleware
+│       ├── models.py              # Pydantic request/response models
+│       ├── dependencies.py        # Shared config, job tracking, ChromaDB client
+│       └── routes/
+│           ├── documents.py       # PDF upload & background processing
+│           ├── query.py           # RAG query endpoint
+│           └── collections.py     # Collection management endpoints
+├── rag_cli.py                      # CLI application
+├── api_server.py                   # API server entry point
 ├── pyproject.toml                  # Project metadata & dependencies
 ├── requirements.txt                # Dependency pinning
 ├── .gitignore                      # Git ignore rules
@@ -292,6 +307,172 @@ answer = query_and_generate(
 
 print(answer)
 ```
+
+### Web API Usage (FastAPI)
+
+The project also exposes the RAG pipeline as a REST API powered by **FastAPI**.
+
+#### Start the API Server
+
+```bash
+python api_server.py
+```
+
+The server starts at `http://localhost:8000` by default. Configure with environment variables:
+
+| Variable | Default | Description |
+|---|---|---|
+| `API_HOST` | `0.0.0.0` | Server bind address |
+| `API_PORT` | `8000` | Server port |
+
+Interactive API documentation is auto-generated at:
+- **Swagger UI**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **ReDoc**: [http://localhost:8000/redoc](http://localhost:8000/redoc)
+
+#### API Endpoints
+
+##### Health Check
+
+```bash
+GET /health
+```
+
+```bash
+curl http://localhost:8000/health
+# {"status": "healthy", "service": "LLM Local RAG API", "version": "0.1.0", ...}
+```
+
+##### Upload a Document
+
+Upload a PDF for background processing into the vector store.
+
+```bash
+POST /api/v1/documents
+```
+
+```bash
+curl -X POST http://localhost:8000/api/v1/documents \
+  -F "file=@path/to/document.pdf" \
+  -F "collection_name=my_docs"
+```
+
+**Response** (HTTP 202 Accepted):
+```json
+{
+  "job_id": "a1b2c3d4-...",
+  "status": "queued",
+  "message": "Document accepted and queued for processing.",
+  "filename": "document.pdf"
+}
+```
+
+**Constraints:**
+- File must be `.pdf`
+- Maximum file size: 50 MB
+
+##### Check Processing Status
+
+```bash
+GET /api/v1/documents/{job_id}
+```
+
+```bash
+curl http://localhost:8000/api/v1/documents/a1b2c3d4-...
+```
+
+**Response:**
+```json
+{
+  "job_id": "a1b2c3d4-...",
+  "status": "completed",
+  "progress": 100,
+  "error": null,
+  "collection_name": "my_docs"
+}
+```
+
+Status values: `pending` → `processing` → `completed` | `failed`
+
+##### Query Documents
+
+Ask a question and get an AI-generated answer from your documents.
+
+```bash
+POST /api/v1/query
+```
+
+```bash
+curl -X POST http://localhost:8000/api/v1/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "How do I reset a password?",
+    "collection_name": "product_docs",
+    "n_results": 5,
+    "web_search": false
+  }'
+```
+
+**Response:**
+```json
+{
+  "answer": "To reset a password, navigate to Settings > User Management...",
+  "sources": [
+    {"text": "...", "heading": "Password Reset", "distance": 0.32}
+  ],
+  "processing_time": 2.45,
+  "used_web_search": false
+}
+```
+
+**Request fields:**
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `question` | string | *required* | The question to ask |
+| `collection_name` | string | `"product_docs"` | ChromaDB collection to query |
+| `n_results` | int (1-50) | `5` | Number of chunks to retrieve |
+| `web_search` | bool | `false` | ⚠️ Enable web search (sends query to DuckDuckGo) |
+
+##### List Collections
+
+```bash
+GET /api/v1/collections
+```
+
+```bash
+curl http://localhost:8000/api/v1/collections
+```
+
+**Response:**
+```json
+[
+  {"name": "product_docs", "document_count": 42, "created_at": null},
+  {"name": "tech_docs", "document_count": 15, "created_at": null}
+]
+```
+
+##### Delete a Collection
+
+```bash
+DELETE /api/v1/collections/{name}
+```
+
+```bash
+curl -X DELETE http://localhost:8000/api/v1/collections/test_collection
+# {"message": "Collection 'test_collection' deleted successfully."}
+```
+
+> **Safety:** The default collection (`product_docs`) cannot be deleted via the API (returns 403).
+
+#### API Error Codes
+
+| Code | Meaning |
+|---|---|
+| 400 | Invalid file type or empty upload |
+| 403 | Attempted to delete the default collection |
+| 404 | Collection or job not found |
+| 413 | File exceeds 50 MB size limit |
+| 422 | Request validation error (auto from Pydantic) |
+| 503 | Ollama service unavailable |
 
 ## CLI Examples
 
@@ -586,10 +767,14 @@ Query results include a `distance` score:
 ### Python Packages
 
 - **pdfminer-six** (≥20260107): PDF text extraction
-- **ollama** (≥0.4.7): Local embedding generation
-- **chromadb** (≥0.5.0): Vector store for semantic search
+- **ollama** (≥0.6.1): Local embedding generation
+- **chromadb** (≥1.5.8): Vector store for semantic search
 - **typer** (≥0.25.1): Modern CLI framework
 - **rich** (≥15.0.0): Rich terminal output formatting
+- **fastapi** (≥0.115.0): Web API framework
+- **uvicorn** (≥0.30.0): ASGI server for FastAPI
+- **python-multipart** (≥0.0.12): File upload support for FastAPI
+- **ddgs** (≥9.14.4): DuckDuckGo web search integration
 - **cffi**, **cryptography**, **charset-normalizer**, **pycparser**: Transitive dependencies
 
 ### External Services
@@ -619,18 +804,14 @@ See `requirements.txt` for exact versions.
   - Enable prompt templates for better control
   - Benefits: Less custom code, advanced features (agents, multi-query retrieval), better conversation handling
   - Complexity: Medium (refactoring existing code)
-- [ ] **Web API**: FastAPI endpoint for document processing
-  - Expose your RAG pipeline as HTTP endpoints instead of CLI-only 
-  - Create FastAPI app with endpoints:
-    - `POST /documents` - Upload & process PDFs
-    - `POST /query` - Ask questions, get JSON responses
-    - `GET /collections` - List available collections
-    - `WebSocket /chat` - Real-time interactive chat
-  - Add CORS support for frontend access
-  - Request/response validation with Pydantic models
-  - Async processing for uploads
-  - Benefits: Enable web UI integration, API access for other applications, multi-user support, remote access
-  - Complexity: Medium-Low (additive, not breaking changes)
+- [x] **Web API**: FastAPI endpoint for document processing
+  - RESTful API with endpoints for document upload, querying, and collection management
+  - Background PDF processing with job tracking and progress reporting
+  - CORS support for frontend access
+  - Pydantic request/response validation
+  - Auto-generated interactive docs (Swagger UI)
+  - Singleton ChromaDB client for efficient connection reuse
+  - TTL-based job cleanup (24h expiry)
 - [ ] **Docker Support**: Containerized deployment
 - [ ] **Testing Suite**: Unit and integration tests
 - [ ] **Documentation**: Extended guides and examples
@@ -678,5 +859,5 @@ For questions or support, please contact the project maintainer.
 
 ---
 
-**Last Updated**: June 7, 2026
+**Last Updated**: August 30, 2026
 
