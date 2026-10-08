@@ -114,24 +114,46 @@ LLM_Local/
    cd LLM_Local
    ```
 
-2. **Create virtual environment** (optional but recommended):
+2. **Create the environment and install dependencies** (recommended: `uv`):
+
+   This project ships a `pyproject.toml` and `uv.lock`, so [`uv`](https://docs.astral.sh/uv/) is the recommended way to set things up — it creates the `.venv` and installs all locked dependencies in one step:
+
+   ```bash
+   uv sync
+   ```
+
+   This creates a `.venv` folder and installs every dependency pinned in `uv.lock`, ensuring a reproducible environment.
+
+   You generally **don't need to manually activate** the environment — just prefix commands with `uv run`:
+
+   ```bash
+   uv run python api_server.py
+   uv run python rag_cli.py query "How do I reset a password?"
+   ```
+
+   If you prefer to activate the environment explicitly (e.g. to run `python` directly):
+   ```bash
+   # On Windows (PowerShell):
+   .venv\Scripts\Activate.ps1
+   # On Windows (cmd.exe):
+   .venv\Scripts\activate.bat
+   # On macOS/Linux:
+   source .venv/bin/activate
+   ```
+
+   To add a new dependency later, use `uv add <package>` (updates `pyproject.toml` and `uv.lock` automatically) instead of editing the files by hand.
+
+   **Alternative: plain `venv` + `pip`** (if you don't want to use `uv`):
    ```bash
    python -m venv .venv
    # On Windows:
    .venv\Scripts\activate
    # On macOS/Linux:
    source .venv/bin/activate
-   ```
 
-3. **Install dependencies**:
-   ```bash
    pip install -r requirements.txt
    ```
 
-   Or using uv:
-   ```bash
-   uv pip install -r requirements.txt
-   ```
 
 ## Quick Start
 
@@ -849,8 +871,11 @@ For questions or support, please contact the project maintainer.
 - Configured in `.python-version`
 
 ### Virtual Environment
-- Pre-configured for uv package manager
+- Pre-configured for the `uv` package manager
 - `uv.lock` provides reproducible builds
+- Setup: `uv sync` (creates `.venv` and installs locked dependencies)
+- Run commands without activating: `uv run python <script>.py`
+- Add dependencies with `uv add <package>` instead of editing `pyproject.toml` manually
 
 ### Code Style
 - Follow PEP 8
