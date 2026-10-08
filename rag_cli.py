@@ -141,7 +141,8 @@ def build(
     build_vectorstore(
         embedded_chunks,
         collection_name=collection_name,
-        persist_dir=persist_dir
+        persist_dir=persist_dir,
+        doc_id=os.path.splitext(base_file_name)[0],
     )
     console.print(f"[green]✓[/green] Vector store built successfully!")
     console.print(f"\n[bold green]Pipeline complete![/bold green] Collection: '{collection_name}' at '{persist_dir}'\n")

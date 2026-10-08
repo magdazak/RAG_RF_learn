@@ -59,7 +59,17 @@ def _process_document(job_id: str, file_path: Path, collection_name: str, persis
         embedded_chunks = embed_chunks(chunks)
         jobs[job_id].progress = 80
 
-        build_vectorstore(embedded_chunks, collection_name=collection_name, persist_dir=persist_dir)
+        # doc_id is namespaced on the ORIGINAL filename (not the job_id-prefixed saved path), so re-uploading the same
+        # filename overwrites its own previous chunks in ChromaDB, while different filenames never collide.
+        original_filename = file_path.name.split(f"{job_id}_", 1)[-1]
+        doc_id = Path(original_filename).stem
+
+        build_vectorstore(
+            embedded_chunks,
+            collection_name=collection_name,
+            persist_dir=persist_dir,
+            doc_id=doc_id,
+        )
 
         jobs[job_id].status = "completed"
         jobs[job_id].progress = 100

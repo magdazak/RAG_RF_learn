@@ -13,9 +13,10 @@ This code is using ChromaDB in persistent client mode, meaning:
 """
 
 import logging
+import uuid
 import chromadb
 import ollama
-from typing import List, Dict, Tuple, Union
+from typing import List, Dict, Optional, Tuple, Union
 from src.rag.embeddings import get_embedding, DEFAULT_EMBED_MODEL
 
 logger = logging.getLogger(__name__)
@@ -27,6 +28,7 @@ def build_vectorstore(
     embedded_chunks: List[Dict],
     collection_name: str = "product_docs",
     persist_dir: str = "./chroma_db",
+    doc_id: Optional[str] = None,
 ) -> None:
     """
     Store embedded chunks inside a persistent ChromaDB collection.
@@ -34,18 +36,34 @@ def build_vectorstore(
     Each chunk must already contain an 'embedding' field (output of embed_chunks()).
     Expected chunk structure: {"text": str, "heading": str | None, "embedding": List[float]}
 
-    Existing documents with the same IDs are upserted (overwritten), so this
-    function is safe to call repeatedly on the same data.
+    IDs are namespaced per-document as "{doc_id}_chunk_{i}". This matters because
+    ChromaDB upserts REPLACE any existing record with the same id: without a
+    document-specific prefix, chunk_0/chunk_1/... from DIFFERENT documents would
+    collide and silently overwrite each other whenever two docs happened to have
+    chunks at the same index (e.g. two 8-chunk PDFs both produce "chunk_0".."chunk_7").
+
+    Passing the SAME doc_id again (e.g. reprocessing the same file with --force)
+    intentionally overwrites that document's previous chunks - this preserves the
+    "safe to call repeatedly" / idempotent-upsert behavior, but now scoped per
+    document instead of colliding across documents.
 
     Parameters:
         embedded_chunks  (List[Dict]): Chunks enriched with embeddings.
         collection_name  (str):        ChromaDB collection name.
         persist_dir      (str):        Directory where ChromaDB persists its data.
+        doc_id           (str | None): Stable identifier for the source document
+                                        (e.g. filename without extension). If not
+                                        provided, a random UUID is used (chunks will
+                                        never collide, but reprocessing the same
+                                        document won't overwrite old chunks either -
+                                        pass a stable doc_id to get that behavior).
     """
     client = chromadb.PersistentClient(path=persist_dir)
     collection = client.get_or_create_collection(name=collection_name)
 
-    ids         = [f"chunk_{i}"               for i, _ in enumerate(embedded_chunks)]
+    prefix = doc_id or uuid.uuid4().hex
+
+    ids         = [f"{prefix}_chunk_{i}"      for i, _ in enumerate(embedded_chunks)]
     embeddings  = [c["embedding"]             for c in embedded_chunks]
     documents   = [c.get("text", "")          for c in embedded_chunks]
     metadatas   = [{"heading": c.get("heading") or ""} for c in embedded_chunks]
@@ -58,8 +76,8 @@ def build_vectorstore(
     )
 
     logger.info(
-        "Stored %d chunk(s) in collection '%s' at '%s'.",
-        len(embedded_chunks), collection_name, persist_dir,
+        "Stored %d chunk(s) in collection '%s' at '%s' (doc_id='%s').",
+        len(embedded_chunks), collection_name, persist_dir, prefix,
     )
 
 
