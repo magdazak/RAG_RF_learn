@@ -20,12 +20,28 @@ if __name__ == "__main__":
     host = os.getenv("API_HOST", "0.0.0.0")
     port = int(os.getenv("API_PORT", "8000"))
 
+    # Auto-reload on code changes (dev only). Disable via API_RELOAD=false.
+    reload_enabled = os.getenv("API_RELOAD", "true").lower() != "false"
+
     # Run the server
     uvicorn.run(
         "src.api.app:app",
         host=host,
         port=port,
-        reload=True,  # Auto-reload on code changes (dev only)
+        reload=reload_enabled,
+        # Only watch actual source files for changes. Without this, uvicorn watches the whole project tree, including
+        # runtime/data directories that get written to during PDF processing (uploads/, chroma_db/, data_processed/,
+        # json_chunks/). Those writes look like "code changes" to the watcher and trigger a full server restart, which
+        # wipes the in-memory job-tracking dict (jobs stuck as "completed" in the logs but 404
+        # on GET /api/v1/documents/{job_id} afterwards).
+        reload_dirs=["src"] if reload_enabled else None,
+        reload_excludes=[
+            "uploads/*",
+            "chroma_db/*",
+            "data_processed/*",
+            "data_raw/*",
+            "json_chunks/*",
+        ] if reload_enabled else None,
         log_level="info"
     )
 
