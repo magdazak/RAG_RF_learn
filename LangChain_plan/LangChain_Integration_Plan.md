@@ -1,7 +1,8 @@
 # LangChain Integration — Detailed Implementation Plan
 
-> Status: **Proposed** · Owner: _TBD_ · Target: Roadmap item "LangChain Integration"
-> Scope: Refactor the current custom RAG pipeline (`src/rag/`) to run on top of
+> - Status: **Proposed** 
+> - Target: Roadmap item "LangChain Integration"
+> - Scope: Refactor the current custom RAG pipeline (`src/rag/`) to run on top of
 > [LangChain](https://python.langchain.com/) while keeping the CLI, FastAPI and
 > ChromaDB store backward-compatible.
 
@@ -140,6 +141,16 @@ dependencies = [
 
 > Run `uv add langchain-core langchain-ollama langchain-chroma langchain-community`
 > so `uv.lock` + `requirements.txt` stay in sync. Verify no CVEs before committing.
+
+> **Package size (latest PyPI releases, wheel / sdist):**
+> - `langchain-core` 1.6.9: ~560 KB / ~986 KB
+> - `langchain-ollama` 1.1.0: ~31 KB / ~130 KB
+> - `langchain-chroma` 1.1.0: ~13 KB / ~215 KB
+> - `langchain-community` 0.4.2: ~2.3 MB / ~32.5 MB
+
+> Own package code totals ~3 MB, but `langchain-community` is the heavy one: it pulls in many transitive dependencies (e.g. SQLAlchemy, aiohttp, numpy, requests). Consider skipping it unless the optional web-search tool needs it. Installed footprint is larger than these figures; measure with `uv add` in a scratch environment if exact numbers matter.
+
+> **Note:** §5 imports `langchain.chains`, which comes from the separate `langchain` package (not listed above). Add `langchain` if keeping that code, or switch to the LCEL equivalent.
 
 ---
 
@@ -301,6 +312,11 @@ Introduce behind a **feature flag** so nothing breaks while we validate.
    - Web search as a LangChain tool; optional agent that decides when to search.
    - Streaming responses (CLI token streaming, API `StreamingResponse`).
    - Optional: multi-query retriever / contextual compression for better recall.
+   - **If `langchain-community` was skipped in §3:** the web-search tool above must
+     either keep using the existing `search_web()` function (no extra package) or
+     `langchain-community` gets added at this phase. Likewise, `DuckDuckGoSearchRun`
+     and any community loaders are unavailable until it is installed. Decide at the
+     start of Phase 3 and record the choice here.
 
 5. **Phase 4 — Cleanup**
    - Once LangChain path is validated, flip default to `langchain`, deprecate the
@@ -369,4 +385,7 @@ Introduce behind a **feature flag** so nothing breaks while we validate.
 - Call sites: [`rag_cli.py`](../rag_cli.py), [`src/api/routes/query.py`](../src/api/routes/query.py)
 - LangChain docs: RAG tutorial, `create_retrieval_chain`, `langchain-ollama`, `langchain-chroma`,
   `RunnableWithMessageHistory`, `create_history_aware_retriever`.
+
+
+
 
