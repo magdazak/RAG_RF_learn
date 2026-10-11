@@ -16,3 +16,6 @@ wheels/
 
 # IDE settings
 .idea/
+
+# RF plans
+RF_collection_plan.md
