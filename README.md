@@ -1,8 +1,8 @@
 # LLM Local
 
-A local RAG (Retrieval Augmented Generation) pipeline for processing PDF documents and querying them using local LLMs. Converts PDFs to vector embeddings and generates concise answers using Ollama.
+A local RAG (Retrieval Augmented Generation) pipeline for processing PDF documents and querying them using local LLMs. Converts PDFs to vector embeddings and generates concise answers using local models served by [Ollama](https://ollama.ai/) (default: `llama3.1:8b` for generation, `nomic-embed-text` for embeddings).
 
-![Python](https://img.shields.io/badge/python-3.12%2B-blue) ![Ollama](https://img.shields.io/badge/LLM-Ollama-black) ![FastAPI](https://img.shields.io/badge/API-FastAPI-009688)
+![Python](https://img.shields.io/badge/python-3.12%2B-blue) ![Ollama](https://img.shields.io/badge/runtime-Ollama-black) ![LLM](https://img.shields.io/badge/LLM-llama3.1%3A8b-blueviolet) ![FastAPI](https://img.shields.io/badge/API-FastAPI-009688)
 
 ## Table of Contents
 
@@ -36,9 +36,9 @@ This project provides a complete pipeline for:
 ```mermaid
 flowchart LR
     PDF[PDF] --> Clean[Extract & clean] --> MD[Markdown] --> Chunk[Chunking]
-    Chunk --> Emb[Ollama embeddings] --> DB[(ChromaDB)]
+    Chunk --> Emb[Embeddings<br/>nomic-embed-text via Ollama] --> DB[(ChromaDB)]
     Q[Question] --> QE[Query embedding] --> DB --> Ctx[Top-N chunks]
-    Ctx --> LLM[Ollama LLM] --> A[Answer + sources]
+    Ctx --> LLM[llama3.1:8b<br/>via Ollama] --> A[Answer + sources]
     Web[DuckDuckGo<br/>optional] -.-> LLM
 ```
 
@@ -210,13 +210,15 @@ The pipeline can be used in three ways. All share the same core code (`src/`) an
 | Upload PDF | `build file.pdf` (synchronous) | `POST /api/v1/documents` (background job) | `load_pdf` + `embed_chunks` + `build_vectorstore` |
 | Ask question | `query "..."` / `interactive` | `POST /api/v1/query` | `query_and_generate()` |
 | Manage collections | – | `GET/DELETE /api/v1/collections` | ChromaDB client |
-| Duplicate detection / `--force` | ✅ | ❌ (not yet) | ❌ |
+| Duplicate detection / `--force` | ✅ (`--force`) | ✅ (`409`, override with `force=true`) | ❌ |
 | Output | Terminal (Rich) | JSON + sources + timing | Python objects |
 | Interactive docs | – | Swagger UI at `/docs` | – |
 
 **Recommendation**
 - **API = primary interface** for anything used by other programs or people.
-- **CLI = admin/dev tool** for quick local tests, bulk ingestion and interactive chat; it is the only place with duplicate detection.
+- **CLI = admin/dev tool** for quick local tests, bulk ingestion and interactive chat.
+
+> ℹ️ Duplicate detection works differently per interface: the **CLI** checks for an existing `json_chunks/<name>_embedded.jsonl` file, while the **API** checks whether the document already exists in the target ChromaDB collection (per collection + filename). Both match on the filename, not the file content.
 
 > ⚠️ Both interfaces write to the same `chroma_db/` directory. Avoid running a CLI `build` while the API is ingesting into the same collection.
 
@@ -232,6 +234,8 @@ python rag_cli.py query "How do I reset a password?"
 ```bash
 python api_server.py   # start server (separate terminal)
 curl -X POST http://localhost:8000/api/v1/documents -F "file=@doc.pdf"
+# Uploading the same file again returns 409; overwrite with force=true
+curl -X POST http://localhost:8000/api/v1/documents -F "file=@doc.pdf" -F "force=true"
 curl -X POST http://localhost:8000/api/v1/query -H "Content-Type: application/json" -d '{"question":"How do I reset a password?"}'
 ```
 
@@ -529,9 +533,12 @@ curl -X POST http://localhost:8000/api/v1/documents \
 }
 ```
 
+**Form fields:** `file` (required), `collection_name` (default `product_docs`), `force` (default `false`).
+
 **Constraints:**
 - File must be `.pdf`
 - Maximum file size: 50 MB
+- Duplicate detection: if a document with the same filename already exists in the collection, the API returns `409`. Re-upload with `-F "force=true"` to overwrite.
 
 ##### Check Processing Status
 
@@ -633,6 +640,7 @@ curl -X DELETE http://localhost:8000/api/v1/collections/test_collection
 | 400 | Invalid file type or empty upload |
 | 403 | Attempted to delete the default collection |
 | 404 | Collection or job not found |
+| 409 | Document already exists in the collection (use `force=true`) |
 | 413 | File exceeds 50 MB size limit |
 | 422 | Request validation error (auto from Pydantic) |
 | 503 | Ollama service unavailable |
@@ -885,7 +893,7 @@ Query results include a `distance` score:
 | API returns **503** / CLI connection error | Ollama is not running. Start it and verify with `ollama list`. |
 | `model not found` | Pull it: `ollama pull nomic-embed-text` and `ollama pull llama3.1:8b`. |
 | Embedding dimension mismatch | Embedding model changed after indexing. Use the same model for build and query, or rebuild the collection. |
-| `build` says PDF already processed | Use `--force` (CLI). The API has no duplicate check yet. |
+| `build` says PDF already processed / API returns **409** | Use `--force` (CLI) or `force=true` (API form field) to overwrite. |
 | Empty or poor answers | Raise `--n-results` / `n_results`; check `distance` values (see [Distance Interpretation](#distance-interpretation)). |
 | `database is locked` / odd Chroma state | Avoid running CLI `build` and API ingestion on the same `chroma_db/` at the same time. |
 | Port already in use | Set `API_PORT` to another value. |
@@ -929,6 +937,7 @@ Dependencies and exact versions are defined in `pyproject.toml` / `uv.lock` (and
   - Background PDF processing with job tracking and progress reporting
   - CORS support for frontend access
   - Pydantic request/response validation
+  - Duplicate detection on upload (`409`, override with `force=true`)
   - Auto-generated interactive docs (Swagger UI)
   - Singleton ChromaDB client for efficient connection reuse
   - TTL-based job cleanup (24h expiry)

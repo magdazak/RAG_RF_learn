@@ -14,6 +14,7 @@ from src.api.dependencies import (
     CHROMA_PERSIST_DIR,
     MAX_FILE_SIZE_BYTES,
     UPLOAD_DIR,
+    document_exists,
     get_jobs,
     jobs,  # used directly by the background task (_process_document)
     register_job,
@@ -96,10 +97,14 @@ async def upload_document(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(..., description="PDF document to process"),
     collection_name: str = Form(default="product_docs", description="Target ChromaDB collection"),
+    force: bool = Form(default=False, description="Reprocess even if the document already exists in the collection"),
     job_store: Dict[str, ProcessingStatus] = Depends(get_jobs),
 ) -> DocumentUploadResponse:
     """
     Upload a PDF document and queue it for background processing into the vector store.
+
+    Returns 409 if a document with the same filename (stem) already exists in the target
+    collection, unless `force=true` is supplied.
     """
     filename = file.filename or "upload.pdf"
     suffix = Path(filename).suffix.lower()
@@ -107,6 +112,17 @@ async def upload_document(
         raise HTTPException(
             status_code=400,
             detail=f"Unsupported file type '{suffix}'. Only {', '.join(sorted(ALLOWED_EXTENSIONS))} are allowed.",
+        )
+
+    # Duplicate detection (synchronous, before queuing). Scoped to (collection, doc_id).
+    doc_id = Path(filename).stem
+    if not force and document_exists(doc_id, collection_name):
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Document '{filename}' already exists in collection '{collection_name}'. "
+                "Re-upload with force=true to overwrite."
+            ),
         )
 
     contents = await file.read()

@@ -32,6 +32,23 @@ def get_chroma_client(persist_dir: str = CHROMA_PERSIST_DIR) -> chromadb.ClientA
     client = _chroma_client
     return client
 
+def document_exists(doc_id: str, collection_name: str, persist_dir: str = CHROMA_PERSIST_DIR) -> bool:
+    """
+    Return True if a document with this doc_id already has chunks stored in the collection.
+
+    Probes for the deterministic first chunk id written by build_vectorstore ("{doc_id}_chunk_0").
+    A missing collection is treated as "not a duplicate" (and is not created by this check).
+    """
+    client = get_chroma_client(persist_dir)
+    try:
+        collection = client.get_collection(name=collection_name)
+    except Exception:  # noqa: BLE001 - collection does not exist yet
+        return False
+
+    existing = collection.get(ids=[f"{doc_id}_chunk_0"])
+    return bool(existing and existing.get("ids"))
+
+
 # Directory where uploaded PDFs are temporarily stored before processing.
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
