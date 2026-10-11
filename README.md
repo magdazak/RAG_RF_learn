@@ -2,6 +2,25 @@
 
 A local RAG (Retrieval Augmented Generation) pipeline for processing PDF documents and querying them using local LLMs. Converts PDFs to vector embeddings and generates concise answers using Ollama.
 
+![Python](https://img.shields.io/badge/python-3.12%2B-blue) ![Ollama](https://img.shields.io/badge/LLM-Ollama-black) ![FastAPI](https://img.shields.io/badge/API-FastAPI-009688)
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Features](#features)
+- [Project Structure](#project-structure)
+- [Installation](#installation)
+- [Choosing an Interface](#choosing-an-interface)
+- [Quick Start](#quick-start)
+- [API Reference (Python modules)](#api-reference-python-modules)
+- [Configuration](#configuration)
+- [Troubleshooting](#troubleshooting)
+- [Data Directories](#data-directories)
+- [Dependencies](#dependencies)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [Development Notes](#development-notes)
+
 ## Overview
 
 This project provides a complete pipeline for:
@@ -14,7 +33,19 @@ This project provides a complete pipeline for:
 6. **Answer Generation**: Synthesize concise answers from retrieved chunks using local LLMs
 7. **Optional Web Search**: Augment answers with internet search (privacy-aware)
 
+```mermaid
+flowchart LR
+    PDF[PDF] --> Clean[Extract & clean] --> MD[Markdown] --> Chunk[Chunking]
+    Chunk --> Emb[Ollama embeddings] --> DB[(ChromaDB)]
+    Q[Question] --> QE[Query embedding] --> DB --> Ctx[Top-N chunks]
+    Ctx --> LLM[Ollama LLM] --> A[Answer + sources]
+    Web[DuckDuckGo<br/>optional] -.-> LLM
+```
+
 ## Features
+
+<details>
+<summary><b>Show full feature list</b></summary>
 
 - 📄 **PDF Text Extraction** using `pdfminer-six`
 - 🧹 **Intelligent Text Cleaning**:
@@ -62,7 +93,12 @@ This project provides a complete pipeline for:
   - Pydantic request/response validation
 - 💾 **JSONL Output**: Save chunks with heading context for RAG pipelines
 
+</details>
+
 ## Project Structure
+
+<details>
+<summary><b>Show directory tree</b></summary>
 
 ```
 LLM_Local/
@@ -90,12 +126,20 @@ LLM_Local/
 │           └── collections.py     # Collection management endpoints
 ├── rag_cli.py                      # CLI application
 ├── api_server.py                   # API server entry point
+├── data_raw/ data_processed/       # Input PDFs / generated Markdown
+├── json_chunks/ chroma_db/         # Chunks (JSONL) / vector store
+├── uploads/                        # Files uploaded via the API
+├── docs/                           # Extra documentation
 ├── pyproject.toml                  # Project metadata & dependencies
-├── requirements.txt                # Dependency pinning
+├── uv.lock                         # Locked dependencies (uv)
+├── requirements.txt                # pip-compatible dependency list
+├── CONTRIBUTING.md                 # Contribution guidelines
 ├── .gitignore                      # Git ignore rules
 ├── .python-version                 # Python version spec
 └── README.md                       # This file
 ```
+
+</details>
 
 ## Installation
 
@@ -155,9 +199,46 @@ LLM_Local/
    ```
 
 
+## Choosing an Interface
+
+The pipeline can be used in three ways. All share the same core code (`src/`) and the same ChromaDB store (`./chroma_db`).
+
+| | **CLI** (`rag_cli.py`) | **REST API** (`api_server.py`) | **Python import** |
+|---|---|---|---|
+| Best for | Local/admin use, batch builds, scripting | Apps, frontends, multi-user/remote access | Notebooks, custom pipelines |
+| Start | `python rag_cli.py <command>` | `python api_server.py` | `from src.rag... import ...` |
+| Upload PDF | `build file.pdf` (synchronous) | `POST /api/v1/documents` (background job) | `load_pdf` + `embed_chunks` + `build_vectorstore` |
+| Ask question | `query "..."` / `interactive` | `POST /api/v1/query` | `query_and_generate()` |
+| Manage collections | – | `GET/DELETE /api/v1/collections` | ChromaDB client |
+| Duplicate detection / `--force` | ✅ | ❌ (not yet) | ❌ |
+| Output | Terminal (Rich) | JSON + sources + timing | Python objects |
+| Interactive docs | – | Swagger UI at `/docs` | – |
+
+**Recommendation**
+- **API = primary interface** for anything used by other programs or people.
+- **CLI = admin/dev tool** for quick local tests, bulk ingestion and interactive chat; it is the only place with duplicate detection.
+
+> ⚠️ Both interfaces write to the same `chroma_db/` directory. Avoid running a CLI `build` while the API is ingesting into the same collection.
+
+### Minimal workflow
+
+**CLI**
+```bash
+python rag_cli.py build doc.pdf
+python rag_cli.py query "How do I reset a password?"
+```
+
+**FastAPI**
+```bash
+python api_server.py   # start server (separate terminal)
+curl -X POST http://localhost:8000/api/v1/documents -F "file=@doc.pdf"
+curl -X POST http://localhost:8000/api/v1/query -H "Content-Type: application/json" -d '{"question":"How do I reset a password?"}'
+```
+
 ## Quick Start
 
-### CLI Usage (Recommended)
+<details>
+<summary><b>CLI Usage</b></summary>
 
 The project provides a modern CLI powered by **Typer** for easy interaction with the RAG pipeline.
 
@@ -283,7 +364,63 @@ Goodbye!
 python rag_cli.py interactive --web-search
 ```
 
-### Programmatic Usage (Python API)
+</details>
+
+<details>
+<summary><b>CLI Examples (common workflows)</b></summary>
+
+**1. Process a new PDF document:**
+```bash
+python rag_cli.py build "C:/Documents/UserManual.pdf"
+```
+
+**2. Process with custom chunking parameters:**
+```bash
+python rag_cli.py build document.pdf --max-chunk-size 1500 --overlap 150
+```
+
+**3. Query your documents:**
+```bash
+python rag_cli.py query "How do I install the software?"
+```
+
+**4. Query with web search augmentation:**
+```bash
+# ⚠️ Only for generic questions - sends query to DuckDuckGo
+python rag_cli.py query "What are OAuth 2.0 best practices?" --web-search
+```
+
+**5. Use multiple collections for different document sets:**
+```bash
+# Build a collection for technical docs
+python rag_cli.py build tech_manual.pdf --collection-name tech_docs
+
+# Build a collection for user guides
+python rag_cli.py build user_guide.pdf --collection-name user_docs
+
+# Query specific collection
+python rag_cli.py query "API endpoints" --collection-name tech_docs
+```
+
+**6. Force rebuild after document update:**
+```bash
+python rag_cli.py build updated_manual.pdf --force
+```
+
+**7. Interactive exploration:**
+```bash
+python rag_cli.py interactive --n-results 5
+```
+
+**8. Interactive with different LLM model:**
+```bash
+python rag_cli.py interactive --model mistral
+```
+
+</details>
+
+<details>
+<summary><b>Programmatic Usage (Python import)</b></summary>
 
 For advanced use cases, you can use the Python API directly:
 
@@ -330,7 +467,10 @@ answer = query_and_generate(
 print(answer)
 ```
 
-### Web API Usage (FastAPI)
+</details>
+
+<details open>
+<summary><b>Web API Usage (FastAPI)</b></summary>
 
 The project also exposes the RAG pipeline as a REST API powered by **FastAPI**.
 
@@ -346,6 +486,7 @@ The server starts at `http://localhost:8000` by default. Configure with environm
 |---|---|---|
 | `API_HOST` | `0.0.0.0` | Server bind address |
 | `API_PORT` | `8000` | Server port |
+| `API_RELOAD` | `true` | Auto-reload on code changes (set `false` in production) |
 
 Interactive API documentation is auto-generated at:
 - **Swagger UI**: [http://localhost:8000/docs](http://localhost:8000/docs)
@@ -496,59 +637,12 @@ curl -X DELETE http://localhost:8000/api/v1/collections/test_collection
 | 422 | Request validation error (auto from Pydantic) |
 | 503 | Ollama service unavailable |
 
-## CLI Examples
+</details>
 
-### Common Workflows
+## API Reference (Python modules)
 
-**1. Process a new PDF document:**
-```bash
-python rag_cli.py build "C:/Documents/UserManual.pdf"
-```
-
-**2. Process with custom chunking parameters:**
-```bash
-python rag_cli.py build document.pdf --max-chunk-size 1500 --overlap 150
-```
-
-**3. Query your documents:**
-```bash
-python rag_cli.py query "How do I install the software?"
-```
-
-**4. Query with web search augmentation:**
-```bash
-# ⚠️ Only for generic questions - sends query to DuckDuckGo
-python rag_cli.py query "What are OAuth 2.0 best practices?" --web-search
-```
-
-**5. Use multiple collections for different document sets:**
-```bash
-# Build a collection for technical docs
-python rag_cli.py build tech_manual.pdf --collection-name tech_docs
-
-# Build a collection for user guides
-python rag_cli.py build user_guide.pdf --collection-name user_docs
-
-# Query specific collection
-python rag_cli.py query "API endpoints" --collection-name tech_docs
-```
-
-**6. Force rebuild after document update:**
-```bash
-python rag_cli.py build updated_manual.pdf --force
-```
-
-**7. Interactive exploration:**
-```bash
-python rag_cli.py interactive --n-results 5
-```
-
-**8. Interactive with different LLM model:**
-```bash
-python rag_cli.py interactive --model mistral
-```
-
-## API Reference
+<details>
+<summary><b>Expand module reference</b></summary>
 
 ### Data Extract Module
 
@@ -731,9 +825,14 @@ Searches the web using DuckDuckGo (optional, privacy-aware).
 **⚠️ Privacy Warning:**
 This function sends your query to DuckDuckGo servers. Do NOT use for sensitive/internal questions.
 
+</details>
+
 ---
 
 ## Configuration
+
+<details>
+<summary><b>Chunking, vector store and distance settings</b></summary>
 
 ### Chunking Parameters
 
@@ -777,6 +876,20 @@ Query results include a `distance` score:
 - **0.5 - 1.0**: Moderate match (potentially useful)
 - **> 1.0**: Weak match (consider filtering out)
 
+</details>
+
+## Troubleshooting
+
+| Symptom | Likely cause / fix |
+|---|---|
+| API returns **503** / CLI connection error | Ollama is not running. Start it and verify with `ollama list`. |
+| `model not found` | Pull it: `ollama pull nomic-embed-text` and `ollama pull llama3.1:8b`. |
+| Embedding dimension mismatch | Embedding model changed after indexing. Use the same model for build and query, or rebuild the collection. |
+| `build` says PDF already processed | Use `--force` (CLI). The API has no duplicate check yet. |
+| Empty or poor answers | Raise `--n-results` / `n_results`; check `distance` values (see [Distance Interpretation](#distance-interpretation)). |
+| `database is locked` / odd Chroma state | Avoid running CLI `build` and API ingestion on the same `chroma_db/` at the same time. |
+| Port already in use | Set `API_PORT` to another value. |
+
 ## Data Directories
 
 - `data_raw/`: Place raw PDF files here (ignored by git)
@@ -786,26 +899,11 @@ Query results include a `distance` score:
 
 ## Dependencies
 
-### Python Packages
+Dependencies and exact versions are defined in `pyproject.toml` / `uv.lock` (and `requirements.txt` for pip).
 
-- **pdfminer-six** (≥20260107): PDF text extraction
-- **ollama** (≥0.6.1): Local embedding generation
-- **chromadb** (≥1.5.8): Vector store for semantic search
-- **typer** (≥0.25.1): Modern CLI framework
-- **rich** (≥15.0.0): Rich terminal output formatting
-- **fastapi** (≥0.115.0): Web API framework
-- **uvicorn** (≥0.30.0): ASGI server for FastAPI
-- **python-multipart** (≥0.0.12): File upload support for FastAPI
-- **ddgs** (≥9.14.4): DuckDuckGo web search integration
-- **cffi**, **cryptography**, **charset-normalizer**, **pycparser**: Transitive dependencies
+**Core packages:** `pdfminer-six` (PDF extraction), `ollama` (embeddings + generation), `chromadb` (vector store), `typer` + `rich` (CLI), `fastapi` + `uvicorn` + `python-multipart` (API), `ddgs` (optional web search).
 
-### External Services
-
-- **Ollama** (local): Download from [ollama.ai](https://ollama.ai/)
-  - Required for embedding generation
-  - Pull embedding model: `ollama pull nomic-embed-text`
-
-See `requirements.txt` for exact versions.
+**External service:** [Ollama](https://ollama.ai/) running locally, with the models listed in [Prerequisites](#prerequisites).
 
 ## Roadmap
 
@@ -834,8 +932,9 @@ See `requirements.txt` for exact versions.
   - Auto-generated interactive docs (Swagger UI)
   - Singleton ChromaDB client for efficient connection reuse
   - TTL-based job cleanup (24h expiry)
-- [ ] **Docker Support**: Containerized deployment
-- [ ] **Testing Suite**: Unit and integration tests
+- [ ] **API duplicate detection**: Reuse the CLI's already-processed check in `POST /api/v1/documents`
+- [ ] **Docker Support**: Containerized deployment (Dockerfile + compose with Ollama)
+- [ ] **Testing Suite**: Unit and integration tests (pytest, FastAPI `TestClient`)
 - [ ] **Documentation**: Extended guides and examples
 
 ## Known Issues & TODOs
@@ -847,42 +946,15 @@ See `requirements.txt` for exact versions.
 
 ## Contributing
 
-Contributions are welcome! Please:
-
-1. Create a feature branch
-2. Make your changes
-3. Test thoroughly
-4. Submit a pull request
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for details. In short: create a feature branch, make your changes, test thoroughly, and open a pull request.
 
 ## License
 
-[Specify your license here - e.g., MIT, Apache 2.0]
-
-## Contact
-
-For questions or support, please contact the project maintainer.
-
----
+No license has been chosen yet. <!-- TODO: add a LICENSE file (e.g. MIT / Apache-2.0) and reference it here -->
 
 ## Development Notes
 
-### Python Version
-- Requires: Python 3.12+
-- Configured in `.python-version`
-
-### Virtual Environment
-- Pre-configured for the `uv` package manager
-- `uv.lock` provides reproducible builds
-- Setup: `uv sync` (creates `.venv` and installs locked dependencies)
-- Run commands without activating: `uv run python <script>.py`
-- Add dependencies with `uv add <package>` instead of editing `pyproject.toml` manually
-
-### Code Style
-- Follow PEP 8
-- Use type hints for public APIs
-- Add docstrings to all functions and modules
-
----
-
-**Last Updated**: August 30, 2026
+- **Python**: 3.12+ (see `.python-version` and `pyproject.toml`)
+- **Environment**: managed with `uv` — `uv sync`, run with `uv run python <script>.py`, add packages with `uv add <package>`
+- **Code style**: PEP 8, type hints for public APIs, docstrings on all functions and modules
 
