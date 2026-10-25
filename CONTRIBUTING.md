@@ -20,8 +20,8 @@ Thank you for your interest in contributing to LLM Local! This document provides
 
 1. **Fork and Clone**:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/LLM_Local.git
-   cd LLM_Local
+   git clone https://github.com/YOUR_USERNAME/RAG_learn.git
+   cd RAG_learn
    ```
 
 2. **Create Virtual Environment**:

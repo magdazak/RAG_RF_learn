@@ -101,7 +101,7 @@ flowchart LR
 <summary><b>Show directory tree</b></summary>
 
 ```
-LLM_Local/
+RAG_learn/
 ├── src/
 │   ├── __init__.py
 │   ├── data_extract/              # PDF to Markdown pipeline
@@ -155,7 +155,7 @@ LLM_Local/
 1. **Clone the repository**:
    ```bash
    git clone <repository-url>
-   cd LLM_Local
+   cd RAG_learn
    ```
 
 2. **Create the environment and install dependencies** (recommended: `uv`):

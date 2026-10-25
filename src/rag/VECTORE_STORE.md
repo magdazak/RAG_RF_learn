@@ -443,7 +443,7 @@ If you update many PDFs, re-run the full pipeline to keep the vector store in sy
 After implementing the vector store, the project structure includes:
 
 ```
-LLM_Local/
+RAG_learn/
 ├── src/rag/
 │   ├── vectorstore.py       ← ChromaDB + answer generation
 │   ├── embeddings.py        ← Ollama embedding generation

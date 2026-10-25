@@ -799,7 +799,7 @@ wheels = [
 ]
 
 [[package]]
-name = "llm-local"
+name = "RAG_learn"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
