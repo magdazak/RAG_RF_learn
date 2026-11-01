@@ -260,7 +260,7 @@ LangChain creates a natural path toward more advanced agents.
 Example question:
 
 ```text
-How do I reset an PRODUCT device password?
+How do I reset a product password?
 ```
 
 ## Step 1 - Retrieval

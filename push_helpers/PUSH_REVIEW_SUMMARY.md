@@ -210,7 +210,7 @@ dev = [
 
 ### Step 1: Add Files
 ```bash
-cd C:\Users\ep16492\Documents\RAG_learn
+cd C:\<project_root>\RAG_learn
 git add .
 ```
 
