@@ -25,4 +25,4 @@ def load_pdf(path: str) -> str:
     return text
 
 # Example usage: extract text from a specific PDF file
-# load_pdf("C:\\CLIENT\\PRODUCT_NET2\\doc\\CustomDataStorage.pdf")
+# load_pdf("C:\\...\\doc\\CustomDataStorage.pdf")
