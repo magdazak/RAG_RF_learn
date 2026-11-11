@@ -19,6 +19,7 @@ A local RAG (Retrieval Augmented Generation) pipeline for processing PDF documen
 - [Dependencies](#dependencies)
 - [Roadmap](#roadmap)
 - [Contributing](#contributing)
+- [Security & Confidentiality](#security--confidentiality)
 - [Development Notes](#development-notes)
 
 ## Overview
@@ -428,7 +429,7 @@ python rag_cli.py interactive --model mistral
 
 For advanced use cases, you can use the Python API directly:
 
-```python
+```python.
 from src.data_extract.pdf_loader import load_pdf
 from src.data_extract.markdown_converter import pdf_text_to_markdown
 from src.rag.chunking import markdown_chunker
@@ -773,7 +774,7 @@ Performs semantic search on the vector store.
   - `"distance"` (float): Similarity distance (lower = more similar)
 
 **Example:**
-```python
+```python.
 results = query_vectorstore(
     query_text="How do I reset a password?",
     n_results=3
@@ -805,7 +806,7 @@ Retrieves relevant chunks and generates a concise answer using a local LLM.
 - Clear source labeling (local docs vs web)
 
 **Example:**
-```python
+```python.
 answer = query_and_generate(
     query_text="How does JWT authentication work?",
     n_results=5,
@@ -960,6 +961,22 @@ Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for details. I
 ## License
 
 No license has been chosen yet. <!-- TODO: add a LICENSE file (e.g. MIT / Apache-2.0) and reference it here -->
+
+## Security & Confidentiality
+
+This repository must stay free of client or employer-confidential data, even if it is private.
+
+- **No confidential content** in code, docs, examples, tests or commit messages: client/product names, hostnames, URLs, IPs, credentials, real test data. Use neutral placeholders (`CLIENT`, `PRODUCT_A`, `example.com`).
+- **Keep private files in `work_private/`** (git-ignored). Never move them out or `git add` them. Real documents stay in the ignored data folders (`data_raw/`, `data_processed/`, `json_chunks/`, `chroma_db/`); use synthetic samples for tests.
+- **Stage explicit files only** (no `git add .` / `-A`) and review `git status` + `git diff --staged` before every commit.
+- **Local commit guard:** after cloning, enable the tracked hook and create your own untracked pattern list (one regex per line, LF line endings, never committed):
+  ```powershell
+  git config core.hooksPath .githooks
+  # then create .git\forbidden_patterns.txt with your own forbidden terms
+  ```
+  The hook in `.githooks/pre-commit` blocks commits whose staged changes or file names match those patterns.
+- **AI assistants** must follow the confidentiality rules in `AGENTS.md`.
+- Enable GitHub secret scanning / push protection where available.
 
 ## Development Notes
 

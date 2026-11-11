@@ -1,0 +1,18 @@
+#!/bin/sh
+# Block commits whose staged diff matches patterns from .git/forbidden_patterns.txt (local only)
+P=".git/forbidden_patterns.txt"
+
+# No patterns file (e.g. fresh clone) -> skip the check
+[ -f "$P" ] || exit 0
+
+# Scan only added/changed lines (-U0 = no context); grep flags: -n line numbers, -i case-insensitive,
+# -E extended regex, -f read one regex per line from the patterns file
+if git diff --cached -U0 | grep -n -i -E -f "$P"; then
+  echo "COMMIT BLOCKED: staged changes contain forbidden terms."; exit 1
+fi
+
+# Also check the names (paths) of staged files with the same patterns, so a forbidden
+# term in a file name blocks the commit even if the content is clean
+if git diff --cached --name-only | grep -i -E -f "$P"; then
+  echo "COMMIT BLOCKED: forbidden term in file name."; exit 1
+fi
