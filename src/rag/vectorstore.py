@@ -66,7 +66,7 @@ def build_vectorstore(
     ids         = [f"{prefix}_chunk_{i}"      for i, _ in enumerate(embedded_chunks)]
     embeddings  = [c["embedding"]             for c in embedded_chunks]
     documents   = [c.get("text", "")          for c in embedded_chunks]
-    metadatas   = [{"heading": c.get("heading") or ""} for c in embedded_chunks]
+    metadatas   = [{**c.get("metadata", {}), "heading": c.get("heading") or ""} for c in embedded_chunks]
 
     collection.upsert(
         ids=ids,

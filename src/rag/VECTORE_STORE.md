@@ -44,7 +44,8 @@ A **vector store** is essential in RAG because it enables **semantic search** ov
 | **Embedding model** | ✅ Integrated | Ollama `nomic-embed-text` (768 dimensions) |
 | **Storage location** | ✅ Configured | `./chroma_db/` (local, persistent) |
 | **Collection** | ✅ Active | `product_docs` |
-| **Metadata support** | ✅ Enabled | `heading` field for filtering |
+| **Metadata support** | ✅ Enabled | `heading` always; plus any chunk `metadata` (RF chunks: `project`, `source_file`, `type`, `name`, `tags`, `args`) |
+| **Collection `product_ast`** | ✅ Used by `ingest_robot.py` | Robot Framework / Python-library chunks (see `RF_collection_plan.md`) |
 | **Distance metric** | ✅ Default | Cosine similarity (L2 normalized) |
 
 ### Why ChromaDB?
@@ -128,6 +129,8 @@ Each vector storage entry contains:
     "document":  "To reset a password, navigate to...",  # Original chunk text
     "metadata": {
         "heading": "User Management > Passwords"  # Section context
+        # Chunks that carry their own "metadata" dict (e.g. RF chunks from chunking_robot.py) also store those
+        # scalar fields here: project, source_file, type, name, tags, args, ...
     }
 }
 ```
@@ -564,7 +567,7 @@ print(response["response"])
 
 ### 2. **Add hybrid search (keyword + semantic)**
 ChromaDB supports keyword search alongside vector search. Combine both for better recall:
-```python
+```python.
 # Future feature
 results = collection.query(
     query_texts=["password reset"],  # Keyword
@@ -657,7 +660,7 @@ If the memory is weak, the reasoning collapses.
 | Embedding model | `nomic-embed-text` (768-dim) | Already in use, fast, good quality |
 | Persist location | `./chroma_db/` | Relative to project root |
 | IDs | `chunk_{i}` | Simple, reproducible indexing |
-| Metadata stored | `heading` | Enables heading-level filtering |
+| Metadata stored | `heading` + chunk `metadata` | Heading-level filtering; RF chunks add `project`, `type`, etc. (query-side `where` filter not implemented yet) |
 | Distance metric | Cosine (L2) | ChromaDB default; works well for text |
 
 ### Implementation Steps Completed

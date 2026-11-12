@@ -975,7 +975,7 @@ This repository must stay free of client or employer-confidential data, even if 
   # then create .git\forbidden_patterns.txt with your own forbidden terms
   ```
   The hook in `.githooks/pre-commit` blocks commits whose staged changes or file names match those patterns.
-- **AI assistants** must follow the confidentiality rules in `AGENTS.md`.
+- **AI assistants** must follow the confidentiality rules in `AGENTS.md`. This file is git-ignored (not tracked) because it names confidential terms, so each clone must create its own local copy.
 - Enable GitHub secret scanning / push protection where available.
 
 ## Development Notes
