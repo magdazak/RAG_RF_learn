@@ -81,12 +81,21 @@ def build_vectorstore(
     )
 
 
+def build_where(**filters: Optional[str]) -> Optional[Dict]:
+    """Build a ChromaDB `where` clause from non-empty equality filters (None if there are none)."""
+    conds = [{k: v} for k, v in filters.items() if v]
+    if not conds:
+        return None
+    return conds[0] if len(conds) == 1 else {"$and": conds}
+
+
 def query_vectorstore(
     query_text: str,
     collection_name: str = "product_docs",
     persist_dir: str = "./chroma_db",
     n_results: int = 5,
     model: str = DEFAULT_EMBED_MODEL,
+    where: Optional[Dict] = None,
 ) -> List[Dict]:
     """
     Embed a query string and return the top-k most similar chunks.
@@ -97,10 +106,11 @@ def query_vectorstore(
         persist_dir     (str): Directory where ChromaDB data is stored.
         n_results       (int): Number of top results to return.
         model           (str): Ollama model used to embed the query.
+        where           (dict | None): Optional ChromaDB metadata filter (see build_where()).
 
     Returns:
         List[Dict]: Each dict contains:
-            {"text": str, "heading": str, "distance": float}
+            {"text": str, "heading": str, "distance": float, "metadata": dict}
         Sorted from most to least similar (lowest distance first).
     """
     client     = chromadb.PersistentClient(path=persist_dir)
@@ -111,6 +121,7 @@ def query_vectorstore(
     results = collection.query(
         query_embeddings=[query_embedding],
         n_results=n_results,
+        where=where or None,
         include=["documents", "metadatas", "distances"],
     )
 
@@ -124,6 +135,7 @@ def query_vectorstore(
             "text":     text,
             "heading":  meta.get("heading", ""),
             "distance": dist,
+            "metadata": dict(meta),
         })
 
     return output
@@ -138,6 +150,7 @@ def query_and_generate(
     generation_model: str = DEFAULT_GENERATION_MODEL,
     use_web_search: bool = False,
     return_sources: bool = False,
+    where: Optional[Dict] = None,
 ) -> Union[str, Tuple[str, List[Dict]]]:
     """
     Query the vector store and generate a concise answer using a local LLM.
@@ -160,6 +173,7 @@ def query_and_generate(
                                  alongside the answer (as a tuple), so callers
                                  (e.g. the API) don't need to run retrieval a
                                  second time just to show sources.
+        where            (Optional[Dict]):  Conditions to filter the vector store query.
 
     Returns:
         str: A concise answer synthesized from the retrieved chunks.
@@ -172,6 +186,7 @@ def query_and_generate(
         persist_dir=persist_dir,
         n_results=n_results,
         model=embed_model,
+        where=where,
     )
     
     logger.info(f"Retrieved {len(chunks)} chunks from local vector store")

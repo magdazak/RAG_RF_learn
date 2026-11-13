@@ -23,6 +23,11 @@ class QueryRequest(BaseModel):
     web_search: bool = Field(
         default=False, description="Enable web search augmentation"
     )
+    project: Optional[str] = Field(default=None, description="Metadata filter: project (e.g. net)")
+    source_file: Optional[str] = Field(default=None, description="Metadata filter: source file name")
+    type: Optional[str] = Field(
+        default=None, description="Metadata filter: chunk type (keyword, testcase, locator, python_keyword)"
+    )
 
 
 class QueryResponse(BaseModel):
@@ -63,6 +68,24 @@ class ProcessingStatus(BaseModel):
     collection_name: Optional[str] = Field(
         default=None, description="Collection where the document was stored"
     )
+
+
+class ChunkInfo(BaseModel):
+    """One stored chunk with its metadata."""
+
+    id: str = Field(..., description="Chunk id, '{doc_id}_chunk_{i}'")
+    text: str = Field(..., description="Chunk text")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Stored metadata")
+
+
+class ChunkListResponse(BaseModel):
+    """A page of chunks from a collection."""
+
+    collection_name: str
+    total: int = Field(..., description="Total chunks in the collection matching the filters")
+    limit: int
+    offset: int
+    chunks: List[ChunkInfo]
 
 
 class CollectionInfo(BaseModel):

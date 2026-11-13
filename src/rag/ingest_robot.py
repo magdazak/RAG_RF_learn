@@ -49,6 +49,28 @@ def check_duplicates(files: List[Path]) -> None:
         raise SystemExit(f"Duplicate file names, rename them or ingest separately: {dups}")
 
 
+def chunk_file(path: Path, project: str, source_name: str = "") -> List[dict]:
+    """Chunk one .robot/.resource/.py file; `source_name` overrides the stored source_file."""
+    fn = chunk_python_file if path.suffix.lower() == ".py" else chunk_robot_file
+    return fn(str(path), project=project, rel_path=source_name or None)
+
+
+def embed_and_store(chunks: List[dict], project: str, file_name: str, collection: str, persist_dir: str) -> int:
+    """Embed chunks and upsert them under doc_id "{project}/{file_name}". Returns the chunk count."""
+    if not chunks:
+        return 0
+    from src.rag.embeddings import embed_chunks
+    from src.rag.vectorstore import build_vectorstore
+
+    build_vectorstore(
+        embed_chunks(chunks),
+        collection_name=collection,
+        persist_dir=persist_dir,
+        doc_id=f"{project}/{file_name}",
+    )
+    return len(chunks)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--project", required=True, choices=PROJECTS)
@@ -66,8 +88,7 @@ def main() -> None:
 
     all_chunks = []
     for f in files:
-        fn = chunk_python_file if f.suffix.lower() == ".py" else chunk_robot_file
-        chunks = fn(str(f), project=args.project)
+        chunks = chunk_file(f, args.project)
         logger.info("%s: %d chunk(s)", f.name, len(chunks))
         all_chunks.append((f, chunks))
 
@@ -76,18 +97,8 @@ def main() -> None:
         logger.info("Dry run: %d file(s), %d chunk(s); nothing stored.", len(files), total)
         return
 
-    from src.rag.embeddings import embed_chunks
-    from src.rag.vectorstore import build_vectorstore
-
     for f, chunks in all_chunks:
-        if not chunks:
-            continue
-        build_vectorstore(
-            embed_chunks(chunks),
-            collection_name=args.collection,
-            persist_dir=args.persist_dir,
-            doc_id=f"{args.project}/{f.name}",
-        )
+        embed_and_store(chunks, args.project, f.name, args.collection, args.persist_dir)
     logger.info("Done: %d file(s), %d chunk(s) -> '%s' at '%s'.", len(files), total, args.collection, args.persist_dir)
 
 

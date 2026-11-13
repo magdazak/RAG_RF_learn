@@ -23,9 +23,10 @@ async def query(request: QueryRequest) -> QueryResponse:
     """
     # Import lazily so the module can be imported without pulling in heavy deps
     # (ollama, embeddings) unless a query is actually made.
-    from src.rag.vectorstore import query_and_generate
+    from src.rag.vectorstore import build_where, query_and_generate
 
     start_time = time.time()
+    where = build_where(project=request.project, source_file=request.source_file, type=request.type)
 
     try:
         answer, sources = query_and_generate(
@@ -35,6 +36,7 @@ async def query(request: QueryRequest) -> QueryResponse:
             n_results=request.n_results,
             use_web_search=request.web_search,
             return_sources=True,
+            where=where,
         )
     except ConnectionError as exc:
         logger.exception("Could not reach Ollama")

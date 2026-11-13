@@ -69,7 +69,7 @@ class _RobotVisitor(ModelVisitor):
         is_getter = (
             kind == "keyword"
             and len(body_statements) == 1
-            and body_statements[0].type == Token.RETURN_STATEMENT
+            and getattr(body_statements[0], "type", None) == Token.RETURN_STATEMENT
         )
         self.items.append({
             "name": name, "kind": kind, "doc": doc, "tags": tags, "args": args,

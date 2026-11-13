@@ -152,6 +152,108 @@ async def upload_document(
     )
 
 
+ROBOT_EXTENSIONS = {".robot", ".resource", ".py"}
+ROBOT_DEFAULT_COLLECTION = "product_ast"
+
+
+def _process_robot_document(
+    job_id: str, file_path: Path, project: str, collection_name: str, persist_dir: str = CHROMA_PERSIST_DIR
+) -> None:
+    """Background task: chunk -> embed -> store one Robot/Python file (same helpers as the ingest_robot CLI)."""
+    from src.rag.ingest_robot import chunk_file, embed_and_store
+
+    try:
+        jobs[job_id].status = "processing"
+        jobs[job_id].progress = 0
+
+        chunks = chunk_file(file_path, project)
+        jobs[job_id].progress = 40
+
+        count = embed_and_store(chunks, project, file_path.name, collection_name, persist_dir)
+
+        jobs[job_id].status = "completed"
+        jobs[job_id].progress = 100
+        jobs[job_id].collection_name = collection_name
+        logger.info("Job %s completed: %d chunk(s) stored in collection '%s'.", job_id, count, collection_name)
+    except Exception as exc:  # noqa: BLE001 - surface any failure to the client
+        logger.exception("Job %s failed", job_id)
+        jobs[job_id].status = "failed"
+        jobs[job_id].error = str(exc)
+    finally:
+        # The file lives in its own per-job directory so it keeps its original name.
+        try:
+            file_path.unlink(missing_ok=True)
+            file_path.parent.rmdir()
+        except OSError:
+            logger.warning("Could not remove temporary upload: %s", file_path)
+
+
+@router.post("/robot-documents", response_model=DocumentUploadResponse, status_code=202, tags=["Documents"])
+async def upload_robot_document(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(..., description=".robot, .resource or .py file"),
+    project: str = Form(..., description="One of: net, mobile2, mobile3, general"),
+    collection_name: str = Form(default=ROBOT_DEFAULT_COLLECTION, description="Target ChromaDB collection"),
+    force: bool = Form(default=False, description="Overwrite the file if it already exists in the collection"),
+    job_store: Dict[str, ProcessingStatus] = Depends(get_jobs),
+) -> DocumentUploadResponse:
+    """
+    Upload one Robot Framework / Python library file and queue it for chunking, embedding and storage.
+
+    doc_id is "{project}/{file name}"; returns 409 if it already exists unless `force=true`.
+    Poll progress with GET /documents/{job_id}.
+    """
+    from src.rag.chunking_robot import PROJECTS
+
+    if project not in PROJECTS:
+        raise HTTPException(status_code=422, detail=f"project must be one of {list(PROJECTS)}.")
+
+    filename = Path(file.filename or "").name  # strip any client-supplied path
+    suffix = Path(filename).suffix.lower()
+    if suffix not in ROBOT_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type '{suffix}'. Only {', '.join(sorted(ROBOT_EXTENSIONS))} are allowed.",
+        )
+
+    if not force and document_exists(f"{project}/{filename}", collection_name):
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"File '{filename}' already exists for project '{project}' in collection "
+                f"'{collection_name}'. Re-upload with force=true to overwrite."
+            ),
+        )
+
+    contents = await file.read()
+    if not contents:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+    if len(contents) > MAX_FILE_SIZE_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File exceeds maximum size of {MAX_FILE_SIZE_BYTES // (1024 * 1024)}MB.",
+        )
+
+    job_id = str(uuid.uuid4())
+    job_dir = UPLOAD_DIR / job_id
+    job_dir.mkdir(parents=True)
+    saved_path = job_dir / filename
+    saved_path.write_bytes(contents)
+
+    job_store[job_id] = ProcessingStatus(job_id=job_id, status="pending", progress=0)
+    register_job(job_id)
+    background_tasks.add_task(_process_robot_document, job_id, saved_path, project, collection_name)
+
+    logger.info("Queued robot job %s for '%s' (project=%s) -> '%s'.", job_id, filename, project, collection_name)
+
+    return DocumentUploadResponse(
+        job_id=job_id,
+        status="queued",
+        message="Document accepted and queued for processing.",
+        filename=filename,
+    )
+
+
 @router.get("/documents/{job_id}", response_model=ProcessingStatus, tags=["Documents"])
 async def get_document_status(
     job_id: str,

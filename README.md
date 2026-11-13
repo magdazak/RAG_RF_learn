@@ -541,6 +541,21 @@ curl -X POST http://localhost:8000/api/v1/documents \
 - Maximum file size: 50 MB
 - Duplicate detection: if a document with the same filename already exists in the collection, the API returns `409`. Re-upload with `-F "force=true"` to overwrite.
 
+##### Upload a Robot Framework / Python File
+
+Upload one `.robot`, `.resource` or `.py` file for background chunking, embedding and storage (same pipeline as `python -m src.rag.ingest_robot`).
+
+```bash
+curl -X POST http://localhost:8000/api/v1/robot-documents \
+  -F "file=@path/to/Keywords.resource" \
+  -F "project=general" \
+  -F "collection_name=product_ast"
+```
+
+**Form fields:** `file` (required), `project` (required: `net`, `mobile2`, `mobile3` or `general`; otherwise `422`), `collection_name` (default `product_ast`), `force` (default `false`).
+
+**Constraints:** allowed extensions `.robot`, `.resource`, `.py`; maximum 50 MB; `409` if `{project}/{file name}` already exists in the collection (use `force=true` to overwrite). The response is the same as for `POST /documents`; poll progress with the status endpoint below. To ingest a folder, send one request per file.
+
 ##### Check Processing Status
 
 ```bash
@@ -564,9 +579,17 @@ curl http://localhost:8000/api/v1/documents/a1b2c3d4-...
 
 Status values: `pending` → `processing` → `completed` | `failed`
 
+##### List Chunks (with metadata)
+
+```bash
+GET /api/v1/collections/{name}/chunks?project=net&source_file=File.robot&type=locator&limit=50&offset=0
+```
+
+Returns `total` (matching the filters) and a page of `chunks` (`id`, `text`, `metadata`). All filters are optional; `404` if the collection doesn't exist.
+
 ##### Query Documents
 
-Ask a question and get an AI-generated answer from your documents.
+Ask a question and get an AI-generated answer from your documents. Optional body fields `project`, `source_file` and `type` restrict retrieval by chunk metadata; each source returned includes its `metadata`.
 
 ```bash
 POST /api/v1/query
@@ -643,7 +666,7 @@ curl -X DELETE http://localhost:8000/api/v1/collections/test_collection
 | 404 | Collection or job not found |
 | 409 | Document already exists in the collection (use `force=true`) |
 | 413 | File exceeds 50 MB size limit |
-| 422 | Request validation error (auto from Pydantic) |
+| 422 | Request validation error (auto from Pydantic), or invalid `project` on `/robot-documents` |
 | 503 | Ollama service unavailable |
 
 </details>
