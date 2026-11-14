@@ -13,6 +13,7 @@ This code is using ChromaDB in persistent client mode, meaning:
 """
 
 import logging
+import re
 import uuid
 import chromadb
 import ollama
@@ -94,6 +95,63 @@ def build_where_document(contains: Optional[str] = None) -> Optional[Dict]:
     return {"$contains": contains} if contains else None
 
 
+_STOPWORDS = {
+    "a", "an", "and", "are", "as", "at", "be", "by", "can", "do", "does", "for", "from",
+    "how", "i", "in", "is", "it", "of", "on", "or", "the", "to", "us", "we", "what",
+    "which", "with", "keyword", "keywords", "test", "tests", "case", "cases", "there",
+}
+MAX_LEXICAL_HITS = 6
+
+
+def _lexical_name_matches(collection, query_text: str, where, where_document) -> List[Dict]:
+    """
+    Find keyword/test chunks whose `name` has a word starting with EACH meaningful word of the question.
+
+    Complements embedding search, which can miss vague questions even when a
+    keyword with an obviously matching name exists. Needs at least 2 meaningful
+    words, to avoid flooding results with single-word matches. Returns at most
+    MAX_LEXICAL_HITS chunks (shortest names first = most specific), with
+    distance=None and "match": "lexical".
+    """
+    words = [w for w in re.findall(r"[a-z0-9_]+", query_text.lower()) if w not in _STOPWORDS]
+    if len(words) < 2:
+        return []
+
+    hits = []
+    page, offset = 5000, 0
+    while True:
+        data = collection.get(
+            where=where or None,
+            where_document=where_document or None,
+            include=["metadatas"],
+            limit=page,
+            offset=offset,
+        )
+        for cid, meta in zip(data["ids"], data["metadatas"]):
+            if meta.get("type") not in ("keyword", "testcase", "python_keyword"):
+                continue
+            name_words = re.findall(r"[a-z0-9_]+", (meta.get("name") or "").lower())
+            if all(any(n.startswith(w) for n in name_words) for w in words):
+                hits.append((len(name_words), cid, meta))
+        if len(data["ids"]) < page:
+            break
+        offset += page
+
+    hits.sort(key=lambda h: h[0])
+    hits = hits[:MAX_LEXICAL_HITS]
+    if not hits:
+        return []
+
+    # Chunk texts are fetched only for the few winners, not for the whole collection.
+    fetched = collection.get(ids=[h[1] for h in hits], include=["documents"])
+    texts = dict(zip(fetched["ids"], fetched["documents"]))
+    return [
+        {"text": texts[cid], "heading": m.get("heading", ""), "distance": None,
+         "metadata": dict(m), "match": "lexical"}
+        for _, cid, m in hits
+    ]
+
+
 def query_vectorstore(
     query_text: str,
     collection_name: str = "product_docs",
@@ -146,7 +204,14 @@ def query_vectorstore(
             "metadata": dict(meta),
         })
 
-    return output
+    lexical = _lexical_name_matches(collection, query_text, where, where_document)
+    if not lexical:
+        return output
+
+    # Lexical hits first, then vector hits not already included.
+    seen = {h["text"] for h in lexical}
+    vector_hits = [h for h in output if h["text"] not in seen]
+    return lexical + vector_hits[:max(2, n_results - len(lexical))]
 
 
 def query_and_generate(

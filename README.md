@@ -10,15 +10,21 @@ A local RAG (Retrieval Augmented Generation) pipeline for processing PDF documen
 - [Features](#features)
 - [Project Structure](#project-structure)
 - [Installation](#installation)
+  - [Prerequisites](#prerequisites)
+  - [Setup](#setup)
 - [Choosing an Interface](#choosing-an-interface)
+  - [Minimal workflow](#minimal-workflow)
 - [Quick Start](#quick-start)
 - [API Reference (Python modules)](#api-reference-python-modules)
 - [Configuration](#configuration)
 - [Troubleshooting](#troubleshooting)
+  - [Query Response Time](#query-response-time)
 - [Data Directories](#data-directories)
 - [Dependencies](#dependencies)
 - [Roadmap](#roadmap)
+- [Known Issues & TODOs](#known-issues--todos)
 - [Contributing](#contributing)
+- [License](#license)
 - [Security & Confidentiality](#security--confidentiality)
 - [Development Notes](#development-notes)
 
@@ -750,6 +756,167 @@ Generates a vector embedding for a single text string using a local Ollama model
 - `nomic-embed-text` — fast, 768-dim, good for most RAG use cases
 - `mxbai-embed-large` — higher quality, 1024-dim, better retrieval scores
 
+<details>
+<summary>Embedding models comparison</summary>
+
+### Summary
+
+For an AI Test Analyst / RAG solution based on Jira, TestLink, User Manuals, GitLab repositories, and internal documentation:
+
+- **mxbai-embed-large** → best when retrieval accuracy is the top priority.
+- **nomic-embed-text** → best overall balance of performance, scalability, and long-document support.
+
+**Recommended default choice:** `nomic-embed-text`
+
+---
+
+### Feature Comparison
+
+| Feature | mxbai-embed-large | nomic-embed-text |
+|----------|----------|----------|
+| Developer | Mixedbread AI | Nomic AI |
+| Parameters | ~335M | ~137M |
+| Embedding Dimensions | 1024 | 768 |
+| Context Length | 512 tokens | 8192 tokens |
+| Retrieval Quality | Excellent | Very Good |
+| Indexing Speed | Slower | Faster |
+| Memory Usage | Higher | Lower |
+| Vector Storage Size | Larger | Smaller |
+| Long Document Support | Limited | Excellent |
+
+---
+
+### Strengths of mxbai-embed-large
+
+#### Advantages
+- Higher retrieval accuracy.
+- Better semantic understanding.
+- Stronger ranking of highly relevant documents.
+- Performs well with properly chunked documentation.
+
+#### Best For
+- Short and medium-sized chunks (300–1000 tokens).
+- Well-structured RAG systems.
+- Scenarios where precision matters more than speed or storage.
+
+#### Trade-offs
+- Larger vectors (1024 dimensions).
+- Higher storage and memory requirements.
+- Slower indexing and query embedding.
+
+---
+
+### Strengths of nomic-embed-text
+
+#### Advantages
+- Supports up to 8192-token inputs.
+- Faster embedding generation.
+- Lower memory consumption.
+- Smaller vector database footprint.
+- Better suited for mixed document sizes.
+
+#### Best For
+- Large manuals.
+- Long specifications.
+- Wiki pages.
+- Architecture documentation.
+- Enterprise knowledge bases that continuously grow.
+
+#### Trade-offs
+- Slightly lower retrieval accuracy compared to mxbai.
+- Can occasionally rank results less precisely than mxbai in edge cases.
+
+---
+
+### Storage Example
+
+Assuming **100,000 document chunks**:
+
+#### mxbai-embed-large
+
+```text
+100,000 × 1024 × 4 bytes
+≈ 390 MB
+```
+
+#### nomic-embed-text
+
+```text
+100,000 × 768 × 4 bytes
+≈ 293 MB
+```
+
+Result:
+
+- ~25% less storage required with `nomic-embed-text`.
+
+---
+
+### Practical Recommendation
+
+#### Choose mxbai-embed-large if:
+
+- Documents are already chunked into 300–1000 token sections.
+- Retrieval precision is the highest priority.
+- Hardware resources are not a concern.
+- You want the best ranking quality possible.
+
+#### Choose nomic-embed-text if:
+
+- Documents vary greatly in size.
+- You have long User Manuals or specifications.
+- You want faster indexing.
+- You want lower storage and RAM requirements.
+- You expect the knowledge base to grow significantly.
+
+---
+
+### Recommendation for the AI Test Analyst Agent
+
+#### Knowledge Sources
+
+- User Manuals
+- Jira requirements
+- TestLink test cases
+- GitLab repositories
+- Internal documentation
+
+#### Recommended Embedding Model
+
+**✅ nomic-embed-text**
+
+Reasons:
+
+1. Handles long User Manual sections natively.
+2. More scalable as the knowledge base grows.
+3. Faster indexing of large documentation sets.
+4. Lower hardware requirements.
+5. Retrieval quality remains very competitive for enterprise RAG systems.
+
+#### Alternative
+
+**✅ mxbai-embed-large**
+
+Use when:
+
+- All content is pre-chunked to ~500–800 tokens.
+- Maximum retrieval accuracy is more important than storage or processing efficiency.
+
+---
+
+### Final Verdict
+
+| Scenario | Recommended Model |
+|-----------|------------------|
+| Maximum retrieval accuracy | mxbai-embed-large |
+| Large enterprise documentation | nomic-embed-text |
+| Long manuals and specifications | nomic-embed-text |
+| Limited hardware resources | nomic-embed-text |
+| Small, carefully chunked knowledge base | mxbai-embed-large |
+| AI Test Analyst knowledge base | **nomic-embed-text** |
+
+</details>
+
 > ⚠️ Use a **dedicated embedding model**, not a generative model like `llama3.1:8b`.
 
 ---
@@ -922,6 +1089,23 @@ Query results include a `distance` score:
 | Empty or poor answers | Raise `--n-results` / `n_results`; check `distance` values (see [Distance Interpretation](#distance-interpretation)). |
 | `database is locked` / odd Chroma state | Avoid running CLI `build` and API ingestion on the same `chroma_db/` at the same time. |
 | Port already in use | Set `API_PORT` to another value. |
+| `POST /query` takes 10-25 s | Mostly local LLM generation, see [Query Response Time](#query-response-time). |
+
+### Query Response Time
+
+`POST /query` (and `query_and_generate`) typically takes 10-25 s on a laptop. Measured split for one question with `n_results=10`, `project` + `type` filters:
+
+| Step | Time |
+|---|---|
+| Retrieval (query embedding + vector search + lexical name match) | ~2-3 s |
+| Answer generation (`llama3.1:8b`) | ~10-14 s |
+
+Generation dominates. `ollama ps` showed the 8B model split 43% CPU / 57% GPU: it does not fit fully in GPU memory, so it runs slowly. This is a local-model limit, not an API overhead. Ways to reduce it, cheapest first:
+
+1. **Lower `n_results`** (e.g. 5): fewer chunks means a shorter prompt (10 -> 5 saved ~4 s in testing).
+2. **Use a smaller generation model** (e.g. a 3B model) that fits fully on the GPU: faster, but weaker answers.
+3. **Keep the model loaded**: Ollama unloads idle models after 5 minutes and the next call pays the reload. Set `OLLAMA_KEEP_ALIVE=30m`.
+4. **Stream the answer** (not implemented): total time is unchanged, but the first words appear after ~3 s.
 
 ## Data Directories
 
