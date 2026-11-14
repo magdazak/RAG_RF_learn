@@ -10,12 +10,43 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
+class SourceInfo(BaseModel):
+    """Compact description of one retrieved chunk."""
+
+    name: str = Field(default="", description="Keyword / test / section name")
+    type: str = Field(default="", description="Chunk type (keyword, testcase, ...)")
+    project: str = Field(default="", description="Project the chunk belongs to")
+    source_file: str = Field(default="", description="Source file name")
+    args: List[str] = Field(default_factory=list, description="Keyword arguments")
+    tags: List[str] = Field(default_factory=list, description="Tags")
+    score: Optional[float] = Field(
+        default=None, description="Vector distance (lower = closer); null for lexical name matches"
+    )
+    match: str = Field(default="vector", description="'vector' or 'lexical'")
+    snippet: str = Field(default="", description="Trimmed chunk text")
+    text: Optional[str] = Field(default=None, description="Full chunk text (only if include_text=true)")
+
+
+class QueryRequest(BaseModel):
+    """JSON body for POST /query/json (same fields as the form endpoint)."""
+
+    question: str = Field(..., min_length=1)
+    collection_name: str = "product_docs"
+    n_results: int = Field(default=5, ge=1, le=50)
+    web_search: bool = False
+    project: str = ""
+    source_file: str = ""
+    type: str = ""
+    contains: str = ""
+    include_text: bool = False
+
+
 class QueryResponse(BaseModel):
     """Response body containing the generated answer and supporting sources."""
 
-    answer: str = Field(..., description="Generated answer")
-    sources: List[Dict[str, Any]] = Field(
-        default_factory=list, description="Retrieved chunks with metadata"
+    answer: str = Field(..., description="Generated answer (Markdown)")
+    sources: List[SourceInfo] = Field(
+        default_factory=list, description="Retrieved chunks (compact)"
     )
     processing_time: float = Field(..., description="Response time in seconds")
     used_web_search: bool = Field(

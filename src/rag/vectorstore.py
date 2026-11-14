@@ -102,6 +102,22 @@ _STOPWORDS = {
 }
 MAX_LEXICAL_HITS = 6
 
+_RF_TYPES = {"keyword", "testcase", "locator", "python_keyword"}
+
+RF_SYSTEM_PROMPT = """You are an assistant for a Robot Framework test project. Answer ONLY from the context below.
+Rules:
+- Use keyword/test names EXACTLY as written in the context (including the file prefix, e.g. `NetShare.Stop Net`).
+- List only keywords that actually perform the requested action. Do not list helper or unrelated keywords that merely appear inside another keyword's body.
+- If nothing in the context matches, say so instead of guessing.
+- Reply in Markdown using this structure:
+
+**Answer:** one or two sentences.
+
+**Keywords:**
+- `Keyword name` (`file`) - one-line purpose
+
+**Related:** optional, short list of other relevant keywords (omit if none)."""
+
 
 def _lexical_name_matches(collection, query_text: str, where, where_document) -> List[Dict]:
     """
@@ -225,6 +241,7 @@ def query_and_generate(
     return_sources: bool = False,
     where: Optional[Dict] = None,
     where_document: Optional[Dict] = None,
+    system_prompt: Optional[str] = None,
 ) -> Union[str, Tuple[str, List[Dict]]]:
     """
     Query the vector store and generate a concise answer using a local LLM.
@@ -249,6 +266,9 @@ def query_and_generate(
                                  second time just to show sources.
         where            (Optional[Dict]):  Conditions to filter the vector store query.
         where_document   (Optional[Dict]):  Conditions to filter the documents in the vector store query.
+        system_prompt    (Optional[str]):  Custom instructions placed before the context. If None, the
+                                 default documentation prompt is used, or RF_SYSTEM_PROMPT when the
+                                 retrieved chunks are Robot Framework keywords/tests.
 
     Returns:
         str: A concise answer synthesized from the retrieved chunks.
@@ -295,7 +315,22 @@ def query_and_generate(
     context = "\n\n".join(context_parts)
 
     # Generate answer using LLM
-    prompt = f"""Based on the following information, provide a concise and direct answer to the question.
+    if system_prompt is None and any(
+        (c.get("metadata") or {}).get("type") in _RF_TYPES for c in chunks
+    ):
+        system_prompt = RF_SYSTEM_PROMPT
+
+    if system_prompt:
+        prompt = f"""{system_prompt}
+
+Context:
+{context}
+
+Question: {query_text}
+
+Answer:"""
+    else:
+        prompt = f"""Based on the following information, provide a concise and direct answer to the question.
 
 {context}
 

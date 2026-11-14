@@ -1,7 +1,7 @@
 # LangChain Integration — Detailed Implementation Plan
 
 > Status: **Proposed** · Owner: _TBD_ · Target: Roadmap item "LangChain Integration"
-> Scope: Refactor the current custom RAG pipeline (`src/rag/`) to run on top of
+> Scope: Refactor the current custom RAG pipeline (`../../src/rag`) to run on top of
 > [LangChain](https://python.langchain.com/) while keeping the CLI, FastAPI and
 > ChromaDB store backward-compatible.
 
@@ -10,9 +10,9 @@
 ## 1. Motivation
 
 The current pipeline uses **direct Ollama API calls** and hand-written retrieval +
-prompt-assembly logic in [`src/rag/vectorstore.py`](../src/rag/vectorstore.py)
+prompt-assembly logic in [`../../src/rag/vectorstore.py`](../../src/rag/vectorstore.py)
 (`query_vectorstore`, `query_and_generate`) and
-[`src/rag/embeddings.py`](../src/rag/embeddings.py) (`get_embedding`, `embed_chunks`).
+[`../../src/rag/embeddings.py`](../../src/rag/embeddings.py) (`get_embedding`, `embed_chunks`).
 
 LangChain gives us, with far less custom code:
 
@@ -28,9 +28,9 @@ LangChain gives us, with far less custom code:
 
 | Concern | Notes / mitigation |
 |---|---|
-| Added dependencies | `langchain-core`, `langchain-ollama`, `langchain-chroma`, `langchain-community`. Pin versions in `pyproject.toml`. |
+| Added dependencies | `langchain-core`, `langchain-ollama`, `langchain-chroma`, `langchain-community`. Pin versions in `../../pyproject.toml`. |
 | API churn | LangChain evolves fast. Pin exact versions; isolate it behind our own thin wrapper module so swaps are cheap. |
-| Store compatibility | Existing `chroma_db/` was written by raw `chromadb`. LangChain's `Chroma` wrapper must read the **same collection + embedding dim**. See §6. |
+| Store compatibility | Existing `../../chroma_db` was written by raw `chromadb`. LangChain's `Chroma` wrapper must read the **same collection + embedding dim**. See §6. |
 | Hidden behavior | Chains abstract prompt assembly. Keep prompts explicit via `ChatPromptTemplate`. |
 | Complexity | Medium refactor — do it incrementally behind a feature flag (§8). |
 
@@ -126,7 +126,7 @@ the public contract of today's `query_and_generate()` / `embed_chunks()` so call
 
 ## 3. Dependencies
 
-Add to `pyproject.toml` (`uv add ...`) — use the split packages, not the monolithic `langchain`:
+Add to `../../pyproject.toml` (`uv add ...`) — use the split packages, not the monolithic `langchain`:
 
 ```toml
 dependencies = [
@@ -139,7 +139,7 @@ dependencies = [
 ```
 
 > Run `uv add langchain-core langchain-ollama langchain-chroma langchain-community`
-> so `uv.lock` + `requirements.txt` stay in sync. Verify no CVEs before committing.
+> so `../../uv.lock` + `requirements.txt` stay in sync. Verify no CVEs before committing.
 
 ---
 
@@ -236,7 +236,7 @@ def query_and_generate_lc(query_text, collection_name="product_docs",
 
 ## 6. ChromaDB Compatibility (critical)
 
-The existing `chroma_db/` was populated by raw `chromadb` in `build_vectorstore()`.
+The existing `../../chroma_db` was populated by raw `chromadb` in `build_vectorstore()`.
 To let LangChain's `Chroma` read it **without re-ingesting**:
 
 1. **Same embedding model & dimension** — must stay `nomic-embed-text` (768-dim).
@@ -252,7 +252,7 @@ To let LangChain's `Chroma` read it **without re-ingesting**:
    distance by default. To expose the `distance` field our API's `QueryResponse`
    advertises, use `vs.similarity_search_with_score(...)` in a custom retriever, or
    populate `metadata["score"]`. Decide and document this (API contract in
-   [`src/api/models.py`](../src/api/models.py) / [`routes/query.py`](../src/api/routes/query.py)).
+   [`../../src/api/models.py`](../../src/api/models.py) / [`routes/query.py`](../../src/api/routes/query.py)).
 
 > **Recommendation:** validate with a throwaway script that opens the existing
 > collection via `Chroma(...)` and runs a `similarity_search("password reset")`
@@ -289,8 +289,8 @@ Introduce behind a **feature flag** so nothing breaks while we validate.
      current signature (incl. `return_sources`).
    - Gate selection with env var `RAG_BACKEND=langchain|custom` (default `custom`).
    - Wire it in one call site at a time:
-     - `rag_cli.py` `query` / `interactive`
-     - `src/api/routes/query.py`
+     - `../../rag_cli.py` `query` / `interactive`
+     - `../../src/api/routes/query.py`
 
 3. **Phase 2 — Ingestion on LangChain**
    - Add `build_vectorstore_lc()` + a `markdown_chunker → List[Document]` adapter.
@@ -310,14 +310,14 @@ Introduce behind a **feature flag** so nothing breaks while we validate.
 
 ## 9. Required Code Changes (checklist)
 
-- [ ] `pyproject.toml` / `uv.lock` / `requirements.txt` — add LangChain packages (§3).
+- [ ] `../../pyproject.toml` / `uv.lock` / `requirements.txt` — add LangChain packages (§3).
 - [ ] `src/rag/langchain_pipeline.py` — new module (§5).
-- [ ] `src/rag/chunking_utils.py` or new adapter — `chunks(dict) → langchain Document`.
-- [ ] `rag_cli.py` — read `RAG_BACKEND`, dispatch to LC functions.
-- [ ] `src/api/routes/query.py` — dispatch to LC `query_and_generate_lc`; preserve
+- [ ] `../../src/rag/chunking_utils.py` or new adapter — `chunks(dict) → langchain Document`.
+- [ ] `../../rag_cli.py` — read `RAG_BACKEND`, dispatch to LC functions.
+- [ ] `../../src/api/routes/query.py` — dispatch to LC `query_and_generate_lc`; preserve
       `QueryResponse` shape (answer / sources / processing_time / used_web_search).
-- [ ] `src/api/routes/documents.py` — optional LC ingestion path.
-- [ ] Keep `src/rag/vectorstore.py` + `embeddings.py` intact during migration (shims).
+- [ ] `../../src/api/routes/documents.py` — optional LC ingestion path.
+- [ ] Keep `../../src/rag/vectorstore.py` + `embeddings.py` intact during migration (shims).
 - [ ] README: update Roadmap, add a "LangChain backend" note + env var.
 
 ---
@@ -331,7 +331,7 @@ Introduce behind a **feature flag** so nothing breaks while we validate.
 - **Source fidelity:** API `sources[].distance`/score still populated and ordered.
 - **Memory test:** multi-turn conversation where turn 2 depends on turn 1.
 - **Error paths:** Ollama down → still surfaces 503 in API; missing collection → 404.
-- **Regression:** `build` then `query` end-to-end on a sample PDF from `data_raw/`.
+- **Regression:** `build` then `query` end-to-end on a sample PDF from `../../data_raw`.
 - Add `pytest` cases (ties into the Roadmap "Testing Suite" item) using a tiny
   in-memory / temp `persist_dir` collection.
 
@@ -341,7 +341,7 @@ Introduce behind a **feature flag** so nothing breaks while we validate.
 
 - CLI `query`, `interactive`, and API `POST /api/v1/query` work with `RAG_BACKEND=langchain`
   with equivalent or better answer quality.
-- No re-indexing required for the existing `chroma_db/` (same model/collection).
+- No re-indexing required for the existing `../../chroma_db` (same model/collection).
 - API response schema unchanged (`QueryResponse` stays backward compatible).
 - Interactive mode supports at least one-level follow-up questions via memory.
 - Docs + Roadmap updated; feature flag documented; deps pinned and CVE-checked.
@@ -363,10 +363,10 @@ Introduce behind a **feature flag** so nothing breaks while we validate.
 
 ## References
 
-- Current pipeline: [`src/rag/vectorstore.py`](../src/rag/vectorstore.py),
-  [`src/rag/embeddings.py`](../src/rag/embeddings.py),
-  [`src/rag/web_search.py`](../src/rag/web_search.py)
-- Call sites: [`rag_cli.py`](../rag_cli.py), [`src/api/routes/query.py`](../src/api/routes/query.py)
+- Current pipeline: [`../../src/rag/vectorstore.py`](../../src/rag/vectorstore.py),
+  [`../../src/rag/embeddings.py`](../../src/rag/embeddings.py),
+  [`../../src/rag/web_search.py`](../../src/rag/web_search.py)
+- Call sites: [`../../rag_cli.py`](../../rag_cli.py), [`../../src/api/routes/query.py`](../../src/api/routes/query.py)
 - LangChain docs: RAG tutorial, `create_retrieval_chain`, `langchain-ollama`, `langchain-chroma`,
   `RunnableWithMessageHistory`, `create_history_aware_retriever`.
 
