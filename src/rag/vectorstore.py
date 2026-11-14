@@ -89,6 +89,11 @@ def build_where(**filters: Optional[str]) -> Optional[Dict]:
     return conds[0] if len(conds) == 1 else {"$and": conds}
 
 
+def build_where_document(contains: Optional[str] = None) -> Optional[Dict]:
+    """Build a ChromaDB `where_document` clause: exact, case-sensitive substring match on the chunk text."""
+    return {"$contains": contains} if contains else None
+
+
 def query_vectorstore(
     query_text: str,
     collection_name: str = "product_docs",
@@ -96,6 +101,7 @@ def query_vectorstore(
     n_results: int = 5,
     model: str = DEFAULT_EMBED_MODEL,
     where: Optional[Dict] = None,
+    where_document: Optional[Dict] = None,
 ) -> List[Dict]:
     """
     Embed a query string and return the top-k most similar chunks.
@@ -107,6 +113,7 @@ def query_vectorstore(
         n_results       (int): Number of top results to return.
         model           (str): Ollama model used to embed the query.
         where           (dict | None): Optional ChromaDB metadata filter (see build_where()).
+        where_document  (dict | None): Optional text filter, e.g. {"$contains": "kc-login"} (see build_where_document()).
 
     Returns:
         List[Dict]: Each dict contains:
@@ -122,6 +129,7 @@ def query_vectorstore(
         query_embeddings=[query_embedding],
         n_results=n_results,
         where=where or None,
+        where_document=where_document or None,
         include=["documents", "metadatas", "distances"],
     )
 
@@ -151,6 +159,7 @@ def query_and_generate(
     use_web_search: bool = False,
     return_sources: bool = False,
     where: Optional[Dict] = None,
+    where_document: Optional[Dict] = None,
 ) -> Union[str, Tuple[str, List[Dict]]]:
     """
     Query the vector store and generate a concise answer using a local LLM.
@@ -174,6 +183,7 @@ def query_and_generate(
                                  (e.g. the API) don't need to run retrieval a
                                  second time just to show sources.
         where            (Optional[Dict]):  Conditions to filter the vector store query.
+        where_document   (Optional[Dict]):  Conditions to filter the documents in the vector store query.
 
     Returns:
         str: A concise answer synthesized from the retrieved chunks.
@@ -187,6 +197,7 @@ def query_and_generate(
         n_results=n_results,
         model=embed_model,
         where=where,
+        where_document=where_document,
     )
     
     logger.info(f"Retrieved {len(chunks)} chunks from local vector store")

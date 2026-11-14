@@ -237,7 +237,7 @@ python api_server.py   # start server (separate terminal)
 curl -X POST http://localhost:8000/api/v1/documents -F "file=@doc.pdf"
 # Uploading the same file again returns 409; overwrite with force=true
 curl -X POST http://localhost:8000/api/v1/documents -F "file=@doc.pdf" -F "force=true"
-curl -X POST http://localhost:8000/api/v1/query -H "Content-Type: application/json" -d '{"question":"How do I reset a password?"}'
+curl -X POST http://localhost:8000/api/v1/query -F "question=How do I reset a password?"
 ```
 
 ## Quick Start
@@ -582,14 +582,14 @@ Status values: `pending` → `processing` → `completed` | `failed`
 ##### List Chunks (with metadata)
 
 ```bash
-GET /api/v1/collections/{name}/chunks?project=net&source_file=File.robot&type=locator&limit=50&offset=0
+GET /api/v1/collections/{name}/chunks?project=net&source_file=File.robot&type=locator&contains=text&limit=50&offset=0
 ```
 
-Returns `total` (matching the filters) and a page of `chunks` (`id`, `text`, `metadata`). All filters are optional; `404` if the collection doesn't exist.
+Returns `total` (matching the filters) and a page of `chunks` (`id`, `text`, `metadata`). All filters are optional (`contains` is an exact, case-sensitive substring of the chunk text); `404` if the collection doesn't exist.
 
 ##### Query Documents
 
-Ask a question and get an AI-generated answer from your documents. Optional body fields `project`, `source_file` and `type` restrict retrieval by chunk metadata; each source returned includes its `metadata`.
+Ask a question and get an AI-generated answer from your documents. Sent as form fields (like the upload endpoints), not JSON. Optional `project`, `source_file` and `type` restrict retrieval by chunk metadata, and `contains` by exact text (e.g. a selector); empty optional fields are ignored. Each source returned includes its `metadata`.
 
 ```bash
 POST /api/v1/query
@@ -597,13 +597,10 @@ POST /api/v1/query
 
 ```bash
 curl -X POST http://localhost:8000/api/v1/query \
-  -H "Content-Type: application/json" \
-  -d '{
-    "question": "How do I reset a password?",
-    "collection_name": "product_docs",
-    "n_results": 5,
-    "web_search": false
-  }'
+  -F "question=How do I reset a password?" \
+  -F "collection_name=product_docs" \
+  -F "n_results=5" \
+  -F "web_search=false"
 ```
 
 **Response:**
@@ -625,6 +622,10 @@ curl -X POST http://localhost:8000/api/v1/query \
 | `collection_name` | string | `"product_docs"` | ChromaDB collection to query |
 | `n_results` | int (1-50) | `5` | Number of chunks to retrieve |
 | `web_search` | bool | `false` | ⚠️ Enable web search (sends query to DuckDuckGo) |
+| `project` | dropdown | blank (all) | Metadata filter: `net`, `mobile2`, `mobile3`, `general` |
+| `source_file` | string | blank | Metadata filter: source file name |
+| `type` | dropdown | blank (all) | Metadata filter: `keyword`, `testcase`, `locator`, `python_keyword` |
+| `contains` | string | blank | Exact, case-sensitive text substring the chunk must contain |
 
 ##### List Collections
 

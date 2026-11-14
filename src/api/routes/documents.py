@@ -5,9 +5,11 @@ Document upload and background processing endpoints.
 import logging
 import uuid
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
+
+from src.rag.chunking_robot import PROJECTS
 
 from src.api.dependencies import (
     ALLOWED_EXTENSIONS,
@@ -192,7 +194,7 @@ def _process_robot_document(
 async def upload_robot_document(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(..., description=".robot, .resource or .py file"),
-    project: str = Form(..., description="One of: net, mobile2, mobile3, general"),
+    project: Literal[PROJECTS] = Form(..., description="Project the file belongs to"),
     collection_name: str = Form(default=ROBOT_DEFAULT_COLLECTION, description="Target ChromaDB collection"),
     force: bool = Form(default=False, description="Overwrite the file if it already exists in the collection"),
     job_store: Dict[str, ProcessingStatus] = Depends(get_jobs),
@@ -203,11 +205,6 @@ async def upload_robot_document(
     doc_id is "{project}/{file name}"; returns 409 if it already exists unless `force=true`.
     Poll progress with GET /documents/{job_id}.
     """
-    from src.rag.chunking_robot import PROJECTS
-
-    if project not in PROJECTS:
-        raise HTTPException(status_code=422, detail=f"project must be one of {list(PROJECTS)}.")
-
     filename = Path(file.filename or "").name  # strip any client-supplied path
     suffix = Path(filename).suffix.lower()
     if suffix not in ROBOT_EXTENSIONS:

@@ -10,26 +10,6 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
-class QueryRequest(BaseModel):
-    """Request body for asking a question against a collection."""
-
-    question: str = Field(..., description="The question to ask", min_length=1)
-    collection_name: str = Field(
-        default="product_docs", description="ChromaDB collection to query"
-    )
-    n_results: int = Field(
-        default=5, ge=1, le=50, description="Number of chunks to retrieve"
-    )
-    web_search: bool = Field(
-        default=False, description="Enable web search augmentation"
-    )
-    project: Optional[str] = Field(default=None, description="Metadata filter: project (e.g. net)")
-    source_file: Optional[str] = Field(default=None, description="Metadata filter: source file name")
-    type: Optional[str] = Field(
-        default=None, description="Metadata filter: chunk type (keyword, testcase, locator, python_keyword)"
-    )
-
-
 class QueryResponse(BaseModel):
     """Response body containing the generated answer and supporting sources."""
 

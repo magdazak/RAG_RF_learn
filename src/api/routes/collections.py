@@ -56,14 +56,16 @@ async def list_chunks(
     project: Optional[str] = None,
     source_file: Optional[str] = None,
     type: Optional[str] = None,
+    contains: Optional[str] = None,
     limit: int = Query(default=50, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
 ) -> ChunkListResponse:
     """
     List stored chunks (text + metadata) of a collection, optionally filtered by
-    `project`, `source_file` and/or `type`. Paginated with `limit` / `offset`.
+    `project`, `source_file`, `type` and/or `contains` (exact, case-sensitive text substring).
+    Paginated with `limit` / `offset`.
     """
-    from src.rag.vectorstore import build_where
+    from src.rag.vectorstore import build_where, build_where_document
 
     try:
         collection = get_chroma_client().get_collection(name=name)
@@ -71,9 +73,13 @@ async def list_chunks(
         raise HTTPException(status_code=404, detail=f"Collection '{name}' not found.") from exc
 
     where = build_where(project=project, source_file=source_file, type=type)
+    where_document = build_where_document(contains)
     try:
-        matching = collection.get(where=where, include=[])["ids"]
-        page = collection.get(where=where, limit=limit, offset=offset, include=["documents", "metadatas"])
+        matching = collection.get(where=where, where_document=where_document, include=[])["ids"]
+        page = collection.get(
+            where=where, where_document=where_document, limit=limit, offset=offset,
+            include=["documents", "metadatas"],
+        )
     except Exception as exc:
         logger.exception("Failed to read chunks of '%s'", name)
         raise HTTPException(status_code=500, detail=f"Failed to read chunks: {exc}") from exc
